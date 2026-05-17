@@ -1,0 +1,155 @@
+{
+  "theme": "LIGHT",
+  "archetype": "4 (Swiss & High-Contrast)",
+  "brand": {
+    "name": "MaxTracker",
+    "description": "An independent unofficial alternative to search TGV Max 0€ tickets, using SNCF Open Data API."
+  },
+  "typography": {
+    "headings": {
+      "font_family": "'Outfit', sans-serif",
+      "font_weight": "700",
+      "description": "Used for all H1-H6, delivering a modern, geometric, and highly legible tech feel."
+    },
+    "body": {
+      "font_family": "'DM Sans', sans-serif",
+      "font_weight": "400",
+      "description": "Clean, highly readable geometric sans for dense UI details."
+    },
+    "mono": {
+      "font_family": "'JetBrains Mono', monospace",
+      "font_weight": "500",
+      "description": "For times, train numbers, and sync timestamps to ensure perfect vertical alignment."
+    }
+  },
+  "colors": {
+    "primary": {
+      "base": "#0A2540",
+      "hover": "#173A5E",
+      "foreground": "#FFFFFF",
+      "description": "Deep Navy for primary buttons and strong trust-building elements."
+    },
+    "accent": {
+      "base": "#10B981",
+      "hover": "#059669",
+      "foreground": "#FFFFFF",
+      "description": "Vibrant Mint strictly used for '0€' highlights and success states."
+    },
+    "secondary": {
+      "base": "#F1F5F9",
+      "hover": "#E2E8F0",
+      "foreground": "#0F172A",
+      "description": "Soft slate for secondary buttons, filters, and card backgrounds."
+    },
+    "background": {
+      "main": "#FAFAFA",
+      "card": "#FFFFFF",
+      "header": "rgba(255, 255, 255, 0.8)"
+    },
+    "text": {
+      "primary": "#0F172A",
+      "secondary": "#64748B",
+      "disabled": "#94A3B8"
+    },
+    "badges": {
+      "inoui": {
+        "bg": "#E11D48",
+        "text": "#FFFFFF"
+      },
+      "intercites": {
+        "bg": "#0284C7",
+        "text": "#FFFFFF"
+      },
+      "imminent": {
+        "bg": "#F59E0B",
+        "text": "#FFFFFF"
+      }
+    }
+  },
+  "spacing_and_layout": {
+    "philosophy": "Generous spacing. Strict grid alignment for the results list.",
+    "container": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "grid": {
+      "dashboard": "grid-cols-1 lg:grid-cols-12 gap-8",
+      "sidebar": "col-span-1 lg:col-span-3",
+      "main_feed": "col-span-1 lg:col-span-9"
+    },
+    "cards": {
+      "padding": "p-6",
+      "radius": "rounded-xl",
+      "border": "border border-slate-200",
+      "shadow": "shadow-sm hover:shadow-md transition-shadow"
+    }
+  },
+  "components": {
+    "header": {
+      "style": "Crystal Glassmorphism",
+      "classes": "sticky top-0 z-50 backdrop-blur-xl bg-white/80 border-b border-slate-200"
+    },
+    "hero_search": {
+      "style": "Swiss Brutalist meets Modern App",
+      "layout": "Bento-style overlapping search box over the hero background.",
+      "input_classes": "h-14 text-lg border-2 border-slate-200 rounded-lg focus:border-primary focus:ring-primary"
+    },
+    "filters": {
+      "style": "Pill-shaped toggles and Neumorphic active states.",
+      "classes": "bg-slate-50 p-6 rounded-2xl border border-slate-100"
+    },
+    "train_card": {
+      "style": "Grid Borders (The Technical Look)",
+      "layout": "Flex row on desktop, stacked on mobile. Clear separation between departure/arrival times, destination, and the 0€ CTA.",
+      "hover": "translate-y-[-2px] shadow-lg border-slate-300"
+    },
+    "disclaimer": {
+      "style": "Subtle, low-contrast footer banner.",
+      "classes": "text-xs text-slate-500 bg-slate-100 p-4 rounded-lg mt-12"
+    }
+  },
+  "media": {
+    "image_urls": [
+      {
+        "category": "hero_background",
+        "url": "https://static.prod-images.emergentagent.com/jobs/f74c49b6-18a0-4cb7-95f4-30d605669f9b/images/cfaaa1f6fd3ab022112caad3ff0c854d3d7487ef5ce8eb07cef5ff782c6cb730.png",
+        "description": "Abstract sleek background with subtle light trails and deep blue tones, representing speed and travel."
+      },
+      {
+        "category": "empty_state",
+        "url": "https://static.prod-images.emergentagent.com/jobs/f74c49b6-18a0-4cb7-95f4-30d605669f9b/images/a8fc6da684e5f05873d772644a95f43d0c632d9f05c9468e3746d24581b9fbec.png",
+        "description": "Whimsical minimalist train station bench empty state illustration."
+      },
+      {
+        "category": "station_photo_1",
+        "url": "https://images.unsplash.com/photo-1692342380430-6fa4010758bb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjB0cmFpbiUyMHN0YXRpb24lMjBwbGF0Zm9ybXxlbnwwfHx8fDE3NzkwMzU1MjV8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Modern train station platform"
+      },
+      {
+        "category": "station_photo_2",
+        "url": "https://images.unsplash.com/photo-1693572322416-9ea4b36482ce?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB0cmFpbiUyMHN0YXRpb24lMjBwbGF0Zm9ybXxlbnwwfHx8fDE3NzkwMzU1MjV8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Modern train parked at platform"
+      }
+    ]
+  },
+  "icons": {
+    "library": "lucide-react",
+    "usage": "Use thick/bold icons (stroke-width: 2.5) for navigation and thin icons (stroke-width: 1.5) for train details."
+  },
+  "motion_and_interactions": {
+    "hover_states": "All buttons MUST have hover states with color shifts (e.g., bg-primary hover:bg-primary/90).",
+    "page_load": "Staggered fade-in for train results (framer-motion or simple CSS animation).",
+    "loading": "Use pulse animations (skeleton loaders) instead of spinners for data fetching."
+  },
+  "accessibility": {
+    "contrast": "Ensure white text on accent mint (#10B981) meets 3:1 contrast for large buttons. If not, use darker mint or dark text.",
+    "test_ids": "All interactive elements MUST include a data-testid attribute (e.g., data-testid='search-input', data-testid='swap-stations-btn', data-testid='train-card-cta')."
+  },
+  "instructions_to_main_agent": [
+    "Install and configure 'Outfit' and 'DM Sans' fonts via Google Fonts in index.html or layout.",
+    "Use Shadcn UI for standard inputs (Input, Select, Switch for filters, Button, Card, Skeleton).",
+    "Build the Calendar view either using a custom CSS Grid or integrating a simple Shadcn Calendar if it fits.",
+    "Build a custom Recharts bar chart for the 'Peak hours probability graph'.",
+    "Ensure 'Départ imminent' (<4h) badge dynamically renders in the Train Card.",
+    "Ensure the hero background image has a subtle overlay (e.g., bg-black/30) if text is placed directly over it, or place the search form in a solid white Bento card floating over the image.",
+    "Do not use placeholders for missing images; rely purely on the URLs provided in the media section.",
+    "Create a responsive 12-column grid layout where the left 3 columns are for filters and the right 9 for the results feed."
+  ]
+}
