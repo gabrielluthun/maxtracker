@@ -4,7 +4,7 @@ const BACKEND_URL =
   process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
 export const API = `${BACKEND_URL}/api`;
 
-export const api = axios.create({ baseURL: API, timeout: 60000 });
+export const api = axios.create({ baseURL: API, timeout: 120000 });
 
 export async function searchStations(q) {
   if (!q || q.length < 3) return [];
