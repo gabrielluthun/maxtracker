@@ -1,5 +1,16 @@
 """Tests des deep links SNCF Connect."""
-from server import sncf_connect_url
+from app.config import Settings
+from app.services.sncf.connect import build_sncf_connect_url
+
+_SETTINGS = Settings(
+    mongo_url="mongodb://localhost",
+    db_name="test",
+    cors_origins=["*"],
+)
+
+
+def sncf_connect_url(*args, **kwargs):
+    return build_sncf_connect_url(_SETTINGS, *args, **kwargs)
 
 
 class TestSncfConnectUrl:
