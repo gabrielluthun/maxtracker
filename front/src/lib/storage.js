@@ -3,7 +3,6 @@
 const KEYS = {
   favorites: "mt_favorites",
   hidden: "mt_hidden_destinations",
-  lastSearch: "mt_last_search",
 };
 
 export function getFavorites() {
@@ -34,11 +33,4 @@ export function unhideDestination(key) {
   const cur = new Set(getHidden());
   cur.delete(key);
   localStorage.setItem(KEYS.hidden, JSON.stringify([...cur]));
-}
-
-export function getLastSearch() {
-  try { return JSON.parse(localStorage.getItem(KEYS.lastSearch)); } catch { return null; }
-}
-export function setLastSearch(payload) {
-  localStorage.setItem(KEYS.lastSearch, JSON.stringify(payload));
 }
