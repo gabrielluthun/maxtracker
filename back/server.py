@@ -17,6 +17,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from starlette.middleware.cors import CORSMiddleware
 
+from train_classifier import classify_train_type
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
@@ -37,8 +39,10 @@ api_router = APIRouter(prefix="/api")
 
 # ---------- Constants ----------
 SNCF_EXPORT_URL = "https://data.sncf.com/api/explore/v2.1/catalog/datasets/tgvmax/exports/json"
+SNCF_RECORDS_URL = "https://data.sncf.com/api/explore/v2.1/catalog/datasets/tgvmax/records"
 RATE_LIMIT_PER_MIN = 10
 SYNC_INTERVAL_MIN = 15
+LIVE_FARE_CHECK_MAX_TRAINS = 200
 
 # Metropolis grouping: city normalized -> metropolis label
 METROPOLIS_MAP = {
@@ -95,20 +99,6 @@ def metropolis_for(station_normalized: str) -> Optional[str]:
     return METROPOLIS_MAP.get(first)
 
 
-def classify_train_type(train_no: str, axe: str) -> str:
-    """Classify train as TGV INOUI or INTERCITES.
-    Heuristic: axes EST/ATLANTIQUE/SUD-EST/NORD/OUEST -> TGV INOUI.
-    Empty/unknown axe or specific Intercités train numbers -> INTERCITES.
-    """
-    tgv_axes = {"EST", "ATLANTIQUE", "SUD-EST", "SUDEST", "NORD", "OUEST"}
-    if axe and axe.upper().replace(" ", "") in {a.replace("-", "").replace(" ", "") for a in tgv_axes}:
-        return "TGV_INOUI"
-    if not axe or axe.strip() == "":
-        return "INTERCITES"
-    # Default to TGV INOUI if axe is set
-    return "TGV_INOUI"
-
-
 def trip_id(train_no: str, date: str, origine: str, destination: str) -> str:
     raw = f"{train_no}|{date}|{normalize_station(origine)}|{normalize_station(destination)}"
     return raw
@@ -137,7 +127,9 @@ class TripOut(BaseModel):
     heure_depart: str
     heure_arrivee: str
     axe: Optional[str] = ""
-    train_type: str  # TGV_INOUI or INTERCITES
+    train_type: str  # TGV_INOUI | INTERCITES | INTERCITES_NUIT
+    fare_eur: float = 0.0
+    price_checked_at: Optional[str] = None
     sncf_connect_url: str
     destination_metropolis: Optional[str] = None
     departure_datetime: str  # ISO
@@ -189,6 +181,50 @@ async def fetch_sncf_data() -> Optional[list[dict]]:
         return None
 
 
+async def fetch_live_eligible_keys(trips: list[dict]) -> set[str]:
+    """
+    Revalide od_happy_card auprès de l'API SNCF (temps réel) pour les trajets affichés.
+    Retourne l'ensemble des identifiants de trajets encore à 0 € (places MAX ouvertes).
+    """
+    if not trips:
+        return set()
+
+    by_date: dict[str, set[str]] = defaultdict(set)
+    for t in trips:
+        by_date[t["date"]].add(t["train_no"])
+
+    eligible: set[str] = set()
+    try:
+        async with httpx.AsyncClient(timeout=45.0) as http:
+            for date, train_nos in by_date.items():
+                nos = list(train_nos)[:LIVE_FARE_CHECK_MAX_TRAINS]
+                for i in range(0, len(nos), 40):
+                    chunk = nos[i:i + 40]
+                    in_clause = ",".join(f'"{n}"' for n in chunk)
+                    where = f'train_no IN ({in_clause}) AND od_happy_card="OUI"'
+                    params = {"where": where, "limit": 500}
+                    r = await http.get(SNCF_RECORDS_URL, params=params)
+                    r.raise_for_status()
+                    for row in r.json().get("results", []):
+                        if row.get("date") != date:
+                            continue
+                        if row.get("od_happy_card") != "OUI":
+                            continue
+                        eligible.add(
+                            trip_id(
+                                row.get("train_no", ""),
+                                row.get("date", ""),
+                                row.get("origine", ""),
+                                row.get("destination", ""),
+                            )
+                        )
+    except Exception as exc:
+        logger.warning("Live fare check failed, using cached eligibility: %s", exc)
+        return {trip_id(t["train_no"], t["date"], t["origine"], t["destination"]) for t in trips}
+
+    return eligible
+
+
 async def sync_trips() -> dict:
     """Run a sync cycle: fetch, dedupe, store, clean past."""
     started = datetime.now(timezone.utc)
@@ -228,11 +264,15 @@ async def sync_trips() -> dict:
         if tid in seen:
             continue
         seen.add(tid)
+        entity = row.get("entity") or ""
         heure_depart = row.get("heure_depart") or "00:00"
         heure_arrivee = row.get("heure_arrivee") or "00:00"
         axe = row.get("axe") or ""
         origine_iata = row.get("origine_iata") or ""
         destination_iata = row.get("destination_iata") or ""
+        train_type = classify_train_type(entity, axe, origine, destination)
+        if train_type is None:
+            continue
         dep_dt = f"{date}T{heure_depart}:00"
         origine_norm = normalize_station(origine)
         destination_norm = normalize_station(destination)
@@ -240,6 +280,7 @@ async def sync_trips() -> dict:
             "_id": tid,
             "train_no": train_no,
             "date": date,
+            "entity": entity,
             "origine": origine,
             "destination": destination,
             "origine_norm": origine_norm,
@@ -249,7 +290,9 @@ async def sync_trips() -> dict:
             "heure_depart": heure_depart,
             "heure_arrivee": heure_arrivee,
             "axe": axe,
-            "train_type": classify_train_type(train_no, axe),
+            "train_type": train_type,
+            "od_happy_card": row.get("od_happy_card") or "OUI",
+            "fare_eur": 0.0,
             "origine_metropolis": metropolis_for(origine_norm),
             "destination_metropolis": metropolis_for(destination_norm),
             "departure_datetime": dep_dt,
@@ -379,8 +422,16 @@ async def search_trips(request: Request, origin: str = "", hide_metropolis: bool
     sync_doc = await sync_col.find_one({"_id": "main"}, {"_id": 0})
     last_sync = sync_doc.get("last_sync_at") if sync_doc else None
 
-    cursor = trips_col.find(query, {"_id": 0, "origine_norm": 0, "destination_norm": 0, "synced_at": 0}).sort([("departure_datetime", 1)])
+    cursor = trips_col.find(query, {"_id": 0, "origine_norm": 0, "destination_norm": 0, "synced_at": 0, "entity": 0, "od_happy_card": 0}).sort([("departure_datetime", 1)])
     raw = await cursor.to_list(5000)
+
+    price_checked_at = datetime.now(timezone.utc).isoformat()
+    if raw:
+        live_keys = await fetch_live_eligible_keys(raw)
+        raw = [
+            t for t in raw
+            if trip_id(t["train_no"], t["date"], t["origine"], t["destination"]) in live_keys
+        ]
 
     if not raw:
         # Maybe origin not served
@@ -418,6 +469,8 @@ async def search_trips(request: Request, origin: str = "", hide_metropolis: bool
                 heure_arrivee=t["heure_arrivee"],
                 axe=t.get("axe") or "",
                 train_type=t["train_type"],
+                fare_eur=float(t.get("fare_eur", 0.0)),
+                price_checked_at=price_checked_at,
                 sncf_connect_url=sncf_connect_url(
                     t.get("origine_iata", ""), t.get("destination_iata", ""), t["date"], t["heure_depart"]
                 ),
