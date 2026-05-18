@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Search, ArrowLeftRight, Star, X, MapPin } from "lucide-react";
+import { Search, Star, X, MapPin } from "lucide-react";
 import { searchStations } from "@/lib/api";
 import { getFavorites, toggleFavorite } from "@/lib/storage";
 import { cn } from "@/lib/utils";
@@ -114,16 +114,7 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
             )}
           </div>
 
-          <div className="flex flex-row items-center gap-2 shrink-0">
-            <button
-              data-testid="swap-stations-btn"
-              onClick={() => { /* swap is informational - we only do "from" search; provide nudge */ }}
-              disabled
-              className="flex items-center justify-center h-14 w-14 shrink-0 rounded-full border-2 border-slate-200 bg-white text-slate-300 cursor-not-allowed"
-              title="Inversion (saisissez la gare retour)"
-            >
-              <ArrowLeftRight className="h-5 w-5" />
-            </button>
+          <div className="shrink-0">
             <button
               data-testid="search-submit-btn"
               onClick={() => origin && onSearch(origin)}
