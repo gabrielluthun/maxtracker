@@ -22,7 +22,7 @@ function DestinationGroup({ group, onHide, defaultOpen = false }) {
             <h3 className="font-semibold text-lg text-slate-900 truncate">{group.destination_city}</h3>
             <div className="text-xs text-slate-500 truncate">
               {group.destinations.length > 1 ? `${group.destinations.length} gares · ` : ""}
-              <span className="font-mono">{group.trip_count}</span> train{group.trip_count > 1 ? "s" : ""} à 0€
+              <span className="font-mono">{group.trip_count}</span> trajet{group.trip_count > 1 ? "s" : ""} à 0€
             </div>
           </div>
         </div>
@@ -59,7 +59,7 @@ function DestinationGroup({ group, onHide, defaultOpen = false }) {
               className="mt-4 w-full py-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#0A2540] hover:bg-slate-50 text-sm font-semibold text-slate-700 transition-colors"
               data-testid={`load-more-${group.destination_city}`}
             >
-              Afficher 10 trains de plus ({group.trips.length - visibleCount} restants)
+              Afficher 10 trajets de plus ({group.trips.length - visibleCount} restants)
             </button>
           )}
         </div>

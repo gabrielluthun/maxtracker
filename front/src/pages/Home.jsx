@@ -187,10 +187,7 @@ export default function Home() {
               <Sparkles className="h-3.5 w-3.5" /> {syncInfo?.total_trips ? `${syncInfo.total_trips.toLocaleString("fr-FR")} trajets éligibles suivis en France` : "Synchronisation en cours…"}
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#0A2540] leading-[1.05]">
-              Tous les trains éligibles <span className="relative inline-block">
-                <span className="relative z-10 text-[#10B981]">à 0€</span>
-                <span className="absolute inset-x-0 bottom-1 h-3 bg-emerald-100 -z-0 rounded-sm" />
-              </span><br />
+              Tous les trajets éligibles <span className="text-[#10B981]">à 0€</span><br />
               depuis votre gare.
             </h1>
             <p className="mt-4 text-base sm:text-lg text-slate-600 max-w-2xl">
@@ -241,7 +238,7 @@ export default function Home() {
                       Au départ de <span className="text-[#10B981]">{data.origin}</span>
                     </h2>
                     <div className="text-sm text-slate-500 mt-0.5">
-                      <span className="font-mono">{totalTrips}</span> trains · <span className="font-mono">{filteredGroups.length}</span> destinations
+                      <span className="font-mono">{totalTrips}</span> trajets · <span className="font-mono">{filteredGroups.length}</span> destinations
                     </div>
                   </div>
                   <TabsList className="bg-slate-100">
