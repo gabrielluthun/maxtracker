@@ -11,7 +11,7 @@ import Disclaimer from "@/components/Disclaimer";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { searchTrips, getSyncInfo, triggerSync } from "@/lib/api";
-import { getHidden, unhideDestination, hideDestination, getLastSearch, setLastSearch } from "@/lib/storage";
+import { getHidden, unhideDestination, hideDestination } from "@/lib/storage";
 
 const HERO_BG = "https://static.prod-images.emergentagent.com/jobs/f74c49b6-18a0-4cb7-95f4-30d605669f9b/images/cfaaa1f6fd3ab022112caad3ff0c854d3d7487ef5ce8eb07cef5ff782c6cb730.png";
 const EMPTY_BG = "https://static.prod-images.emergentagent.com/jobs/f74c49b6-18a0-4cb7-95f4-30d605669f9b/images/a8fc6da684e5f05873d772644a95f43d0c632d9f05c9468e3746d24581b9fbec.png";
@@ -35,19 +35,13 @@ export default function Home() {
   const [hidden, setHidden] = useState(getHidden());
   const [tab, setTab] = useState("list");
 
-  // Initial: load sync info + restore last search
   useEffect(() => {
     getSyncInfo().then(setSyncInfo).catch(() => {});
-    const last = getLastSearch();
-    if (last?.origin) {
-      setOrigin(last.origin);
-      handleSearch(last.origin, false);
-    }
     const id = setInterval(() => getSyncInfo().then(setSyncInfo).catch(() => {}), 60000);
     return () => clearInterval(id);
-  }, []); // eslint-disable-line
+  }, []);
 
-  const handleSearch = async (station, savePref = true) => {
+  const handleSearch = async (station, freshPrices = false) => {
     if (!station || !station.raw) {
       toast.error("Sélectionnez une gare valide");
       return;
@@ -55,9 +49,8 @@ export default function Home() {
     setLoading(true);
     setData(null);
     try {
-      const res = await searchTrips(station.raw);
+      const res = await searchTrips(station.raw, { freshPrices });
       setData(res);
-      if (savePref) setLastSearch({ origin: station });
       if (res.total_trips === 0 && res.served) {
         toast.info("Aucun train à 0€ pour le moment — réessayez plus tard.");
       }
@@ -77,7 +70,7 @@ export default function Home() {
       const info = await getSyncInfo();
       setSyncInfo(info);
       toast.success("Synchronisation effectuée");
-      if (origin) handleSearch(origin, false);
+      if (origin) handleSearch(origin, true);
     } catch {
       toast.error("Synchronisation impossible");
     } finally {
