@@ -96,6 +96,8 @@ export default function TrainCard({ trip }) {
             href={trip.sncf_connect_url}
             target="_blank"
             rel="noopener noreferrer"
+            title={`Réserver sur SNCF Connect : ${trip.origine} → ${trip.destination}, ${dayLabel} à ${fmtHHmm(trip.heure_depart)}`}
+            aria-label={`Réserver sur SNCF Connect, ${trip.origine} vers ${trip.destination}, ${dayLabel} à ${fmtHHmm(trip.heure_depart)}`}
             className="inline-flex items-center gap-2 bg-[#10B981] hover:bg-[#059669] text-white font-bold rounded-lg px-4 py-2.5 transition-colors"
           >
             <span className="font-mono">{formatFare(fare)}</span>
