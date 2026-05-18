@@ -301,8 +301,8 @@ function EmptyHero() {
       <div>
         <h3 className="text-2xl font-bold text-[#0A2540] mb-2">Prêt à voyager ?</h3>
         <p className="text-slate-600">
-          Choisissez votre gare de départ ci-dessus pour voir instantanément <strong>toutes les destinations</strong>
-          encore réservables à 0€ avec votre abonnement TGV Max — dans les 30 prochains jours.
+          Choisissez votre gare de départ ci-dessus pour voir instantanément <strong>toutes les destinations </strong>
+          réservables à 0€ avec votre abonnement TGV Max dans les <strong>30 prochains jours</strong>.
         </p>
         <ul className="mt-5 space-y-2 text-sm text-slate-600">
           <li className="flex items-start gap-2"><span className="text-[#10B981] font-bold">→</span> Regroupement intelligent par ville</li>
