@@ -44,6 +44,7 @@ SNCF_DATASET_META_URL = "https://data.sncf.com/api/explore/v2.1/catalog/datasets
 RATE_LIMIT_PER_MIN = 10
 SYNC_INTERVAL_MIN = 15
 LIVE_FARE_CHECK_MAX_TRAINS = 200
+SNCF_RECORDS_PAGE_LIMIT = 100  # max autorisé par l'API Explore v2.1
 
 # Metropolis grouping: city normalized -> metropolis label
 METROPOLIS_MAP = {
@@ -216,23 +217,36 @@ async def fetch_live_eligible_keys(trips: list[dict]) -> set[str]:
                 for i in range(0, len(nos), 40):
                     chunk = nos[i:i + 40]
                     in_clause = ",".join(f'"{n}"' for n in chunk)
-                    where = f'train_no IN ({in_clause}) AND od_happy_card="OUI"'
-                    params = {"where": where, "limit": 500}
-                    r = await http.get(SNCF_RECORDS_URL, params=params)
-                    r.raise_for_status()
-                    for row in r.json().get("results", []):
-                        if row.get("date") != date:
-                            continue
-                        if row.get("od_happy_card") != "OUI":
-                            continue
-                        eligible.add(
-                            trip_id(
-                                row.get("train_no", ""),
-                                row.get("date", ""),
-                                row.get("origine", ""),
-                                row.get("destination", ""),
+                    where = (
+                        f'date >= "{date}" AND date <= "{date}" '
+                        f'AND train_no IN ({in_clause}) AND od_happy_card="OUI"'
+                    )
+                    offset = 0
+                    while True:
+                        params = {
+                            "where": where,
+                            "limit": SNCF_RECORDS_PAGE_LIMIT,
+                            "offset": offset,
+                        }
+                        r = await http.get(SNCF_RECORDS_URL, params=params)
+                        r.raise_for_status()
+                        payload = r.json()
+                        rows = payload.get("results", [])
+                        for row in rows:
+                            if row.get("od_happy_card") != "OUI":
+                                continue
+                            eligible.add(
+                                trip_id(
+                                    row.get("train_no", ""),
+                                    row.get("date", ""),
+                                    row.get("origine", ""),
+                                    row.get("destination", ""),
+                                )
                             )
-                        )
+                        total = payload.get("total_count", 0)
+                        offset += len(rows)
+                        if not rows or offset >= total:
+                            break
     except Exception as exc:
         logger.warning("Live fare check failed, using cached eligibility: %s", exc)
         return {trip_id(t["train_no"], t["date"], t["origine"], t["destination"]) for t in trips}
@@ -417,7 +431,12 @@ async def search_stations(q: str = "", limit: int = 15):
 
 
 @api_router.get("/search", response_model=SearchResponse)
-async def search_trips(request: Request, origin: str = "", hide_metropolis: bool = False):
+async def search_trips(
+    request: Request,
+    origin: str = "",
+    hide_metropolis: bool = False,
+    fresh_prices: bool = False,
+):
     """Find all eligible 0€ trips departing from `origin` (station name or metropolis label)."""
     # RG7: rate limit
     ip = request.client.host if request.client else "anon"
@@ -450,7 +469,7 @@ async def search_trips(request: Request, origin: str = "", hide_metropolis: bool
     raw = await cursor.to_list(5000)
 
     price_checked_at = datetime.now(timezone.utc).isoformat()
-    if raw:
+    if raw and fresh_prices:
         live_keys = await fetch_live_eligible_keys(raw)
         raw = [
             t for t in raw
