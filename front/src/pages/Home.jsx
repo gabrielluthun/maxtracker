@@ -238,7 +238,8 @@ export default function Home() {
                       Au départ de <span className="text-[#10B981]">{data.origin}</span>
                     </h2>
                     <div className="text-sm text-slate-500 mt-0.5">
-                      <span className="font-mono">{totalTrips}</span> trajets · <span className="font-mono">{filteredGroups.length}</span> destinations
+                      <span className="font-mono">{totalTrips}</span> trajet{totalTrips > 1 ? "s" : ""} ·{" "}
+                      <span className="font-mono">{filteredGroups.length}</span> destination{filteredGroups.length > 1 ? "s" : ""}
                     </div>
                   </div>
                   <TabsList className="bg-slate-100">
