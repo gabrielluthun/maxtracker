@@ -8,6 +8,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Optional
+from urllib.parse import urlencode
 
 import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -106,15 +107,56 @@ def trip_id(train_no: str, date: str, origine: str, destination: str) -> str:
     return raw
 
 
-def sncf_connect_url(origine_iata: str, destination_iata: str, date: str, heure_depart: str) -> str:
-    """Build a deep link to SNCF Connect for the given trip."""
-    # SNCF Connect search URL pattern (deep-link via search page)
-    # Format: https://www.sncf-connect.com/app/home/search?origin=...&destination=...&date=...
-    return (
-        f"https://www.sncf-connect.com/app/home/search"
-        f"?origin={origine_iata}&destination={destination_iata}"
-        f"&inwardDate={date}T{heure_depart}:00"
-    )
+SNCF_CONNECT_BASE = "https://www.sncf-connect.com"
+
+
+def _format_french_search_date(iso_date: str) -> str:
+    """Turn YYYY-MM-DD into a French phrase for the express search fallback."""
+    try:
+        dt = datetime.strptime(iso_date, "%Y-%m-%d")
+        months = (
+            "janvier", "février", "mars", "avril", "mai", "juin",
+            "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+        )
+        return f"{dt.day} {months[dt.month - 1]}"
+    except ValueError:
+        return iso_date
+
+
+def sncf_connect_url(
+    origine_iata: str,
+    destination_iata: str,
+    date: str,
+    heure_depart: str,
+    origine: str = "",
+    destination: str = "",
+) -> str:
+    """
+    Deep link SNCF Connect via l'endpoint officiel /redirect (codes RESARAIL de l'Open Data).
+    Voir les liens « billet » sur sncf-connect.com/tgv-inoui/destinations.
+    """
+    origin_code = (origine_iata or "").strip()
+    dest_code = (destination_iata or "").strip()
+    time_part = (heure_depart or "00:00").strip()[:5]
+
+    if origin_code and dest_code:
+        params = {
+            "nb_pax": "1",
+            "origin_transporter_code": origin_code,
+            "destination_transporter_code": dest_code,
+            "redirection_type": "SEARCH",
+        }
+        if date:
+            params["outwardDate"] = f"{date}T{time_part}:00"
+        return f"{SNCF_CONNECT_BASE}/redirect?{urlencode(params)}"
+
+    # Repli : recherche en langage naturel si les codes gare manquent
+    parts = [origine.strip(), destination.strip()]
+    if date:
+        parts.append(f"le {_format_french_search_date(date)}")
+    if time_part:
+        parts.append(f"à {time_part.replace(':', 'h')}")
+    return f"{SNCF_CONNECT_BASE}/app/home/search?{urlencode({'q': ' '.join(p for p in parts if p)})}"
 
 
 # ---------- Models ----------
@@ -515,7 +557,12 @@ async def search_trips(
                 fare_eur=float(t.get("fare_eur", 0.0)),
                 price_checked_at=price_checked_at,
                 sncf_connect_url=sncf_connect_url(
-                    t.get("origine_iata", ""), t.get("destination_iata", ""), t["date"], t["heure_depart"]
+                    t.get("origine_iata", ""),
+                    t.get("destination_iata", ""),
+                    t["date"],
+                    t["heure_depart"],
+                    t.get("origine", ""),
+                    t.get("destination", ""),
                 ),
                 destination_metropolis=t.get("destination_metropolis"),
                 departure_datetime=t["departure_datetime"],
