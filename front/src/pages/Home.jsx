@@ -13,6 +13,7 @@ import CalendarView from "@/components/CalendarView";
 import PeakHoursChart from "@/components/PeakHoursChart";
 import SyncBadge from "@/components/SyncBadge";
 import Disclaimer from "@/components/Disclaimer";
+import WelcomeModal from "@/components/WelcomeModal";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { searchTrips, getSyncInfo, triggerSync } from "@/lib/api";
@@ -151,6 +152,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen hero-radial">
+      <WelcomeModal />
       {/* Header */}
       <header className="glass sticky top-0 z-40 border-b border-slate-200/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
@@ -182,18 +184,18 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold px-3 py-1 rounded-full mb-4">
-              <Sparkles className="h-3.5 w-3.5" /> {syncInfo?.total_trips ? `${syncInfo.total_trips.toLocaleString("fr-FR")} trains à 0€ référencés` : "Données SNCF Open Data"}
+              <Sparkles className="h-3.5 w-3.5" /> {syncInfo?.total_trips ? `${syncInfo.total_trips.toLocaleString("fr-FR")} trajets éligibles suivis en France` : "Synchronisation en cours…"}
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#0A2540] leading-[1.05]">
-              Tous les trains <span className="relative inline-block">
+              Tous les trains éligibles <span className="relative inline-block">
                 <span className="relative z-10 text-[#10B981]">à 0€</span>
                 <span className="absolute inset-x-0 bottom-1 h-3 bg-emerald-100 -z-0 rounded-sm" />
               </span><br />
               depuis votre gare.
             </h1>
             <p className="mt-4 text-base sm:text-lg text-slate-600 max-w-2xl">
-              Saisissez votre gare de départ : MaxTracker scanne l'Open Data SNCF en temps quasi-réel et regroupe pour
-              vous toutes les destinations encore disponibles avec votre abonnement TGV Max.
+              Saisissez votre gare de départ : MaxTracker consulte les disponibilités en temps quasi-réel et regroupe
+              pour vous toutes les destinations accessibles depuis n'importe quelle gare TGV.
             </p>
           </div>
 
