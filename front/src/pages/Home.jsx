@@ -21,6 +21,7 @@ const defaultFilters = {
   timeSlots: { morning: true, afternoon: true, evening: true },
   showInoui: true,
   showIntercites: true,
+  showIntercitesNuit: true,
   directOnly: false,
 };
 
@@ -103,6 +104,8 @@ export default function Home() {
         // Train type
         if (t.train_type === "TGV_INOUI" && !filters.showInoui) return false;
         if (t.train_type === "INTERCITES" && !filters.showIntercites) return false;
+        if (t.train_type === "INTERCITES_NUIT" && !filters.showIntercitesNuit) return false;
+        if (t.fare_eur != null && t.fare_eur > 0) return false;
         return true;
       });
       if (trips.length === 0) continue;
