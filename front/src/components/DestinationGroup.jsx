@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, MapPin, EyeOff } from "lucide-react";
 import TrainCard from "@/components/TrainCard";
 import { cn } from "@/lib/utils";
 
-export default function DestinationGroup({ group, onHide, defaultOpen = true }) {
+export default function DestinationGroup({ group, onHide, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   const [visibleCount, setVisibleCount] = useState(10);
   const visible = group.trips.slice(0, visibleCount);
