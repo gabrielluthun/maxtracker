@@ -7,6 +7,7 @@ import unicodedata
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from typing import List, Optional
 from urllib.parse import urlencode
 
@@ -46,6 +47,7 @@ RATE_LIMIT_PER_MIN = 10
 SYNC_INTERVAL_MIN = 15
 LIVE_FARE_CHECK_MAX_TRAINS = 200
 SNCF_RECORDS_PAGE_LIMIT = 100  # max autorisé par l'API Explore v2.1
+PARIS_TZ = ZoneInfo("Europe/Paris")
 
 # Metropolis grouping: city normalized -> metropolis label
 METROPOLIS_MAP = {
@@ -105,6 +107,23 @@ def metropolis_for(station_normalized: str) -> Optional[str]:
 def trip_id(train_no: str, date: str, origine: str, destination: str) -> str:
     raw = f"{train_no}|{date}|{normalize_station(origine)}|{normalize_station(destination)}"
     return raw
+
+
+def paris_cleanup_cutoff(now: datetime | None = None) -> tuple[str, str]:
+    """Date et heure (HH:MM) en Europe/Paris pour RG4 (heures SNCF = heure locale France)."""
+    dt = datetime.now(PARIS_TZ) if now is None else now.astimezone(PARIS_TZ)
+    return dt.date().isoformat(), dt.strftime("%H:%M")
+
+
+def departure_passed(date: str, heure_depart: str, *, now: datetime | None = None) -> bool:
+    """True si le départ (date + heure locales France) est déjà passé."""
+    today, cur_time = paris_cleanup_cutoff(now)
+    dep_time = (heure_depart or "00:00").strip()[:5]
+    if date < today:
+        return True
+    if date > today:
+        return False
+    return dep_time < cur_time
 
 
 SNCF_CONNECT_BASE = "https://www.sncf-connect.com"
@@ -225,7 +244,7 @@ async def fetch_sncf_dataset_updated_at() -> Optional[str]:
 
 async def fetch_sncf_data() -> Optional[list[dict]]:
     """Fetch eligible TGV Max trips from SNCF Open Data."""
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(PARIS_TZ).date()
     future = today + timedelta(days=30)
     where = f'od_happy_card="OUI" AND date>="{today.isoformat()}" AND date<="{future.isoformat()}"'
     params = {"where": where, "limit": -1}
@@ -313,8 +332,8 @@ async def sync_trips() -> dict:
         )
         return {"status": "error", "reason": "sncf_unavailable"}
 
-    today_iso = datetime.now(timezone.utc).date().isoformat()
-    future_iso = (datetime.now(timezone.utc).date() + timedelta(days=30)).isoformat()
+    today_iso = datetime.now(PARIS_TZ).date().isoformat()
+    future_iso = (datetime.now(PARIS_TZ).date() + timedelta(days=30)).isoformat()
 
     # Build documents, dedupe in-memory
     seen = set()
@@ -378,11 +397,8 @@ async def sync_trips() -> dict:
         for i in range(0, len(docs), chunk):
             await trips_col.insert_many(docs[i:i + chunk], ordered=False)
 
-    # RG4: remove past departures (in case sync had any). Since we just rebuilt, the export already future-only by date.
-    # But also remove same-day past times:
-    now = datetime.now(timezone.utc)
-    today = now.date().isoformat()
-    cur_time = now.strftime("%H:%M")
+    # RG4: remove past departures (heures SNCF = Europe/Paris)
+    today, cur_time = paris_cleanup_cutoff()
     await trips_col.delete_many({"date": today, "heure_depart": {"$lt": cur_time}})
 
     total = await trips_col.count_documents({})
@@ -404,10 +420,8 @@ async def sync_trips() -> dict:
 
 
 async def cleanup_past_trips():
-    """RG4: remove trips whose departure has passed."""
-    now = datetime.now(timezone.utc)
-    today = now.date().isoformat()
-    cur_time = now.strftime("%H:%M")
+    """RG4: remove trips whose departure has passed (heure locale France)."""
+    today, cur_time = paris_cleanup_cutoff()
     res1 = await trips_col.delete_many({"date": {"$lt": today}})
     res2 = await trips_col.delete_many({"date": today, "heure_depart": {"$lt": cur_time}})
     if res1.deleted_count or res2.deleted_count:
@@ -509,6 +523,7 @@ async def search_trips(
 
     cursor = trips_col.find(query, {"_id": 0, "origine_norm": 0, "destination_norm": 0, "synced_at": 0, "entity": 0, "od_happy_card": 0}).sort([("departure_datetime", 1)])
     raw = await cursor.to_list(5000)
+    raw = [t for t in raw if not departure_passed(t["date"], t["heure_depart"])]
 
     price_checked_at = datetime.now(timezone.utc).isoformat()
     if raw and fresh_prices:

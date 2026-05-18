@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Train, List, CalendarDays, BarChart3, Sparkles, AlertCircle, Inbox } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import FiltersPanel from "@/components/FiltersPanel";
+import { isDeparturePast } from "@/lib/tripTime";
 import DestinationGroup from "@/components/DestinationGroup";
 import CalendarView from "@/components/CalendarView";
 import PeakHoursChart from "@/components/PeakHoursChart";
@@ -85,6 +86,7 @@ export default function Home() {
     for (const g of data.groups) {
       if (hidden.includes(g.destination_city)) continue;
       const trips = g.trips.filter((t) => {
+        if (isDeparturePast(t.date, t.heure_depart)) return false;
         // Weekend filter
         if (filters.weekendOnly) {
           const day = new Date(`${t.date}T00:00:00`).getDay();
