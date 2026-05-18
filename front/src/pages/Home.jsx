@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { searchTrips, getSyncInfo, triggerSync } from "@/lib/api";
 import { getHidden, unhideDestination, hideDestination } from "@/lib/storage";
+import { cn } from "@/lib/utils";
 
 const HERO_BG = "https://static.prod-images.emergentagent.com/jobs/f74c49b6-18a0-4cb7-95f4-30d605669f9b/images/cfaaa1f6fd3ab022112caad3ff0c854d3d7487ef5ce8eb07cef5ff782c6cb730.png";
 const EMPTY_BG = "https://static.prod-images.emergentagent.com/jobs/f74c49b6-18a0-4cb7-95f4-30d605669f9b/images/a8fc6da684e5f05873d772644a95f43d0c632d9f05c9468e3746d24581b9fbec.png";
@@ -33,8 +34,14 @@ export default function Home() {
   const [syncInfo, setSyncInfo] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [filters, setFilters] = useState(defaultFilters);
+  const [animateResults, setAnimateResults] = useState(false);
   const [hidden, setHidden] = useState(getHidden());
   const [tab, setTab] = useState("list");
+
+  const onFiltersChange = (next) => {
+    setAnimateResults(false);
+    setFilters(next);
+  };
 
   useEffect(() => {
     getSyncInfo().then(setSyncInfo).catch(() => {});
@@ -52,6 +59,7 @@ export default function Home() {
     try {
       const res = await searchTrips(station.raw, { freshPrices });
       setData(res);
+      setAnimateResults(true);
       if (res.total_trips === 0 && res.served) {
         toast.info("Aucun train à 0€ pour le moment — réessayez plus tard.");
       }
@@ -79,7 +87,6 @@ export default function Home() {
     }
   };
 
-  // Apply client-side filters
   const filteredGroups = useMemo(() => {
     if (!data?.groups) return [];
     const out = [];
@@ -87,16 +94,13 @@ export default function Home() {
       if (hidden.includes(g.destination_city)) continue;
       const trips = g.trips.filter((t) => {
         if (isDeparturePast(t.date, t.heure_depart)) return false;
-        // Weekend filter
         if (filters.weekendOnly) {
           const day = new Date(`${t.date}T00:00:00`).getDay();
           if (day !== 0 && day !== 6) return false;
         }
-        // Time slot filter
         const h = parseInt((t.heure_depart || "0").slice(0, 2), 10);
         const slot = h < 12 ? "morning" : h < 18 ? "afternoon" : "evening";
         if (!filters.timeSlots[slot]) return false;
-        // Train type
         if (t.train_type === "TGV_INOUI" && !filters.showInoui) return false;
         if (t.train_type === "INTERCITES" && !filters.showIntercites) return false;
         if (t.train_type === "INTERCITES_NUIT" && !filters.showIntercitesNuit) return false;
@@ -193,7 +197,7 @@ export default function Home() {
             <div className="lg:col-span-3 order-2 lg:order-1">
               <FiltersPanel
                 filters={filters}
-                onChange={setFilters}
+                onChange={onFiltersChange}
                 hiddenCount={hidden.length}
                 onResetHidden={onResetHidden}
                 totalDestinations={filteredGroups.length}
@@ -224,7 +228,7 @@ export default function Home() {
                       Aucun résultat avec ces filtres.
                     </div>
                   ) : (
-                    <div className="space-y-4 stagger">
+                    <div className={cn("space-y-4", animateResults && "stagger")}>
                       {filteredGroups.map((g) => (
                         <DestinationGroup key={g.destination_city} group={g} onHide={onHide} />
                       ))}

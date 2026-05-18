@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, MapPin, EyeOff } from "lucide-react";
 import TrainCard from "@/components/TrainCard";
-import { cn } from "@/lib/utils";
-
 export default function DestinationGroup({ group, onHide, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   const [visibleCount, setVisibleCount] = useState(10);
@@ -52,7 +50,7 @@ export default function DestinationGroup({ group, onHide, defaultOpen = false })
               ))}
             </div>
           )}
-          <div className={cn("space-y-3 stagger")}>
+          <div className="space-y-3">
             {visible.map((t) => <TrainCard key={t.id} trip={t} />)}
           </div>
           {hasMore && (
