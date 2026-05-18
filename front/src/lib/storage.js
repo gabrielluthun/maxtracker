@@ -3,7 +3,20 @@
 const KEYS = {
   favorites: "mt_favorites",
   hidden: "mt_hidden_destinations",
+  welcomeDismissed: "mt_welcome_dismissed",
 };
+
+export function isWelcomeDismissed() {
+  try {
+    return localStorage.getItem(KEYS.welcomeDismissed) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function setWelcomeDismissed() {
+  localStorage.setItem(KEYS.welcomeDismissed, "true");
+}
 
 export function getFavorites() {
   try { return JSON.parse(localStorage.getItem(KEYS.favorites)) || []; } catch { return []; }
