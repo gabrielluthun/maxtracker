@@ -11,7 +11,7 @@ MaxTracker est un service **indépendant et non officiel**. Il ne vend pas de bi
 - [À quoi ça sert ?](#à-quoi-ça-sert-)
 - [Comment l’utiliser](#comment-lutiliser)
 - [Ce que vous pouvez faire](#ce-que-vous-pouvez-faire)
-- [Bon à savoir avant de réserver](#bon-à-savoir-avant-de-réserver)
+- [Bon à savoir](#bon-à-savoir)
 - [Avertissement](#avertissement)
 - [Pour les développeurs](#pour-les-développeurs)
 
