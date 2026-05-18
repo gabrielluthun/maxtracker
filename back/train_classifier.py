@@ -3,13 +3,20 @@ import re
 import unicodedata
 from typing import Optional
 
+# Opérateurs / entités exclusivement TER dans le jeu de données SNCF.
 TER_ENTITIES = frozenset({"AZURPA", "PAAZUR", "PAVDR", "VDRPA"})
 
-_COASTAL_RAW = (
-    "NICE VILLE", "ANTIBES", "CANNES", "JUAN LES PINS", "MANDELIEU LA NAPOULE",
-    "ST RAPHAEL VALESCURE", "FREJUS", "TOULON", "HYERES", "LA SEYNE SUR MER",
-    "BANDOL", "SANARY SUR MER",
-)
+# Numéros de train qui n'apparaissent qu'avec des entités TER (données OUI SNCF).
+TER_EXCLUSIVE_TRAIN_NUMBERS = frozenset({
+    "32950", "6106", "6124", "6153", "6155", "6163", "6165", "6168", "6170",
+    "6173", "6174", "6175", "6176", "6177", "6180", "6181", "6186", "6187",
+    "6188", "6191", "6193", "6194", "6195", "6196", "6198",
+})
+
+# Entités « correspondance » : un train peut inclure des tronçons TGV et des tronçons TER.
+CORRESPONDANCE_ENTITIES = frozenset({
+    "JCPROVSUD", "JCSUDPROV", "JCSUDATL", "JCATLSUD", "JCNORDSUD", "JCBRETNORD", "JCRHINRHON",
+})
 
 TGV_AXES_NORM = frozenset({
     "EST", "ATLANTIQUE", "NORD", "OUEST", "SUDEST", "INTERNATIONAL",
@@ -24,39 +31,42 @@ def normalize_station(name: str) -> str:
     return re.sub(r"\s+", " ", only_ascii.upper()).strip()
 
 
-COASTAL_TER_STATIONS = frozenset(normalize_station(s) for s in _COASTAL_RAW)
-
-
 def _has_tgv_station(name: str) -> bool:
     return "TGV" in (name or "").upper()
-
-
-def _is_coastal_ter_od(origine: str, destination: str) -> bool:
-    """Liaison TER courte entre deux gares côtières sans gare TGV dans le libellé."""
-    if _has_tgv_station(origine) or _has_tgv_station(destination):
-        return False
-    o = normalize_station(origine)
-    d = normalize_station(destination)
-    return o in COASTAL_TER_STATIONS and d in COASTAL_TER_STATIONS
 
 
 def _normalize_axe(axe: str) -> str:
     return (axe or "").upper().replace(" ", "").replace("-", "")
 
 
-def classify_train_type(entity: str, axe: str, origine: str, destination: str) -> Optional[str]:
+def _is_ter_train(entity: str, train_no: str, origine: str, destination: str) -> bool:
+    """Détecte un train TER (régional), y compris les tronçons de correspondance."""
+    ent = (entity or "").upper()
+    if ent in TER_ENTITIES:
+        return True
+    if (train_no or "") in TER_EXCLUSIVE_TRAIN_NUMBERS:
+        return True
+    if ent in CORRESPONDANCE_ENTITIES:
+        if not _has_tgv_station(origine) and not _has_tgv_station(destination):
+            return True
+    return False
+
+
+def classify_train_type(
+    entity: str, axe: str, origine: str, destination: str, train_no: str = ""
+) -> Optional[str]:
     """
-    Retourne TGV_INOUI, INTERCITES, INTERCITES_NUIT, ou None si le trajet doit être exclu (TER, OUIGO…).
+    Retourne TGV_INOUI, INTERCITES, INTERCITES_NUIT, ou None (TER / hors abonnement).
+    Les OUIGO sont regroupés sous TGV_INOUI.
     """
     ent = (entity or "").upper()
     ax = (axe or "").strip().upper()
 
+    if _is_ter_train(ent, train_no, origine, destination):
+        return None
+
     if "OUIGO" in ent or "OUIGO" in ax:
-        return None
-    if ent in TER_ENTITIES:
-        return None
-    if _is_coastal_ter_od(origine, destination):
-        return None
+        return "TGV_INOUI"
 
     if ax == "IC ARO":
         return "INTERCITES"
@@ -69,5 +79,7 @@ def classify_train_type(entity: str, axe: str, origine: str, destination: str) -
     return "INTERCITES"
 
 
-def is_eligible_subscription_train(entity: str, axe: str, origine: str, destination: str) -> bool:
-    return classify_train_type(entity, axe, origine, destination) is not None
+def is_eligible_subscription_train(
+    entity: str, axe: str, origine: str, destination: str, train_no: str = ""
+) -> bool:
+    return classify_train_type(entity, axe, origine, destination, train_no) is not None
