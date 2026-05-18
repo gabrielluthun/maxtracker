@@ -40,6 +40,7 @@ api_router = APIRouter(prefix="/api")
 # ---------- Constants ----------
 SNCF_EXPORT_URL = "https://data.sncf.com/api/explore/v2.1/catalog/datasets/tgvmax/exports/json"
 SNCF_RECORDS_URL = "https://data.sncf.com/api/explore/v2.1/catalog/datasets/tgvmax/records"
+SNCF_DATASET_META_URL = "https://data.sncf.com/api/explore/v2.1/catalog/datasets/tgvmax/"
 RATE_LIMIT_PER_MIN = 10
 SYNC_INTERVAL_MIN = 15
 LIVE_FARE_CHECK_MAX_TRAINS = 200
@@ -153,6 +154,7 @@ class SearchResponse(BaseModel):
 class SyncInfo(BaseModel):
     last_sync_at: Optional[str] = None
     last_sync_status: str = "pending"
+    sncf_data_updated_at: Optional[str] = None
     total_trips: int = 0
     last_error: Optional[str] = None
     next_sync_at: Optional[str] = None
@@ -165,6 +167,19 @@ class StationSuggestion(BaseModel):
 
 
 # ---------- Sync logic ----------
+async def fetch_sncf_dataset_updated_at() -> Optional[str]:
+    """Date de dernière réactualisation du jeu de données côté SNCF Open Data."""
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as http:
+            r = await http.get(SNCF_DATASET_META_URL)
+            r.raise_for_status()
+            default_meta = (r.json().get("metas") or {}).get("default") or {}
+            return default_meta.get("data_processed") or default_meta.get("modified")
+    except Exception as exc:
+        logger.warning("SNCF dataset metadata fetch failed: %s", exc)
+        return None
+
+
 async def fetch_sncf_data() -> Optional[list[dict]]:
     """Fetch eligible TGV Max trips from SNCF Open Data."""
     today = datetime.now(timezone.utc).date()
@@ -316,11 +331,13 @@ async def sync_trips() -> dict:
 
     total = await trips_col.count_documents({})
     finished = datetime.now(timezone.utc)
+    sncf_updated = await fetch_sncf_dataset_updated_at()
     await sync_col.update_one(
         {"_id": "main"},
         {"$set": {
             "last_sync_at": finished.isoformat(),
             "last_sync_status": "ok",
+            "sncf_data_updated_at": sncf_updated,
             "total_trips": total,
             "last_error": None,
         }},
@@ -349,10 +366,17 @@ async def root():
 
 @api_router.get("/sync/info", response_model=SyncInfo)
 async def get_sync_info():
-    doc = await sync_col.find_one({"_id": "main"}, {"_id": 0})
-    if not doc:
-        return SyncInfo()
-    return SyncInfo(**doc)
+    doc = await sync_col.find_one({"_id": "main"}, {"_id": 0}) or {}
+    if not doc.get("sncf_data_updated_at"):
+        sncf_updated = await fetch_sncf_dataset_updated_at()
+        if sncf_updated:
+            doc["sncf_data_updated_at"] = sncf_updated
+            await sync_col.update_one(
+                {"_id": "main"},
+                {"$set": {"sncf_data_updated_at": sncf_updated}},
+                upsert=True,
+            )
+    return SyncInfo(**doc) if doc else SyncInfo()
 
 
 @api_router.post("/sync/trigger")
