@@ -60,7 +60,7 @@ export default function FiltersPanel({ filters, onChange, hiddenCount, onResetHi
           <div className="flex items-center gap-2 font-medium text-slate-800 mb-2">
             <Train className="h-4 w-4 text-slate-500" /> Type de train
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2">
             <button
               onClick={() => set("showInoui", !filters.showInoui)}
               data-testid="filter-inoui"
@@ -75,6 +75,13 @@ export default function FiltersPanel({ filters, onChange, hiddenCount, onResetHi
                 filters.showIntercites ? "bg-[#0284C7] text-white border-[#0284C7]" : "bg-white text-slate-600 border-slate-200"
               }`}
             >INTERCITÉS</button>
+            <button
+              onClick={() => set("showIntercitesNuit", !filters.showIntercitesNuit)}
+              data-testid="filter-intercites-nuit"
+              className={`px-2 py-2 rounded-lg border text-xs font-semibold transition-colors ${
+                filters.showIntercitesNuit ? "bg-[#4F46E5] text-white border-[#4F46E5]" : "bg-white text-slate-600 border-slate-200"
+              }`}
+            >INTERCITÉS DE NUIT</button>
           </div>
         </div>
 
