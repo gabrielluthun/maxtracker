@@ -1,9 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Train, List, CalendarDays, BarChart3, Sparkles, AlertCircle, Inbox } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import FiltersPanel from "@/components/FiltersPanel";
-import { isDeparturePast } from "@/lib/tripTime";
+import {
+  enrichSearchGroups,
+  tripMatchesFilters,
+  tripsArrayEqual,
+} from "@/lib/tripTime";
 import DestinationGroup from "@/components/DestinationGroup";
 import CalendarView from "@/components/CalendarView";
 import PeakHoursChart from "@/components/PeakHoursChart";
@@ -87,39 +91,62 @@ export default function Home() {
     }
   };
 
-  const filteredGroups = useMemo(() => {
-    if (!data?.groups) return [];
+  const preparedGroups = useMemo(
+    () => enrichSearchGroups(data?.groups),
+    [data]
+  );
+
+  const filteredCacheRef = useRef(new Map());
+
+  const { groups: filteredGroups, totalTrips } = useMemo(() => {
+    if (!preparedGroups.length) return { groups: [], totalTrips: 0 };
+    const hiddenSet = new Set(hidden);
+    const cache = filteredCacheRef.current;
+    const nextCache = new Map();
     const out = [];
-    for (const g of data.groups) {
-      if (hidden.includes(g.destination_city)) continue;
-      const trips = g.trips.filter((t) => {
-        if (isDeparturePast(t.date, t.heure_depart)) return false;
-        if (filters.weekendOnly) {
-          const day = new Date(`${t.date}T00:00:00`).getDay();
-          if (day !== 0 && day !== 6) return false;
-        }
-        const h = parseInt((t.heure_depart || "0").slice(0, 2), 10);
-        const slot = h < 12 ? "morning" : h < 18 ? "afternoon" : "evening";
-        if (!filters.timeSlots[slot]) return false;
-        if (t.train_type === "TGV_INOUI" && !filters.showInoui) return false;
-        if (t.train_type === "INTERCITES" && !filters.showIntercites) return false;
-        if (t.train_type === "INTERCITES_NUIT" && !filters.showIntercitesNuit) return false;
-        if (t.fare_eur != null && t.fare_eur > 0) return false;
-        return true;
-      });
+    let total = 0;
+
+    for (const g of preparedGroups) {
+      if (hiddenSet.has(g.destination_city)) continue;
+      const trips = [];
+      for (const t of g.trips) {
+        if (tripMatchesFilters(t, filters)) trips.push(t);
+      }
       if (trips.length === 0) continue;
-      out.push({ ...g, trips, trip_count: trips.length });
+      total += trips.length;
+      const key = g.destination_city;
+      const prev = cache.get(key);
+      if (prev && tripsArrayEqual(prev.trips, trips)) {
+        nextCache.set(key, prev);
+        out.push(prev);
+      } else {
+        const entry = { ...g, trips, trip_count: trips.length };
+        nextCache.set(key, entry);
+        out.push(entry);
+      }
     }
-    return out;
-  }, [data, filters, hidden]);
+    filteredCacheRef.current = nextCache;
+    return { groups: out, totalTrips: total };
+  }, [preparedGroups, filters, hidden]);
 
-  const allFilteredTrips = useMemo(() => filteredGroups.flatMap((g) => g.trips), [filteredGroups]);
+  const allFilteredTrips = useMemo(() => {
+    if (tab === "list") return [];
+    return filteredGroups.flatMap((g) => g.trips);
+  }, [filteredGroups, tab]);
 
-  const onHide = (key) => {
+  const onHide = useCallback((key) => {
     hideDestination(key);
     setHidden(getHidden());
-    toast(`Destination « ${key} » masquée`, { action: { label: "Annuler", onClick: () => { unhideDestination(key); setHidden(getHidden()); } } });
-  };
+    toast(`Destination « ${key} » masquée`, {
+      action: {
+        label: "Annuler",
+        onClick: () => {
+          unhideDestination(key);
+          setHidden(getHidden());
+        },
+      },
+    });
+  }, []);
   const onResetHidden = () => { localStorage.removeItem("mt_hidden_destinations"); setHidden([]); };
 
   return (
@@ -212,7 +239,7 @@ export default function Home() {
                       Au départ de <span className="text-[#10B981]">{data.origin}</span>
                     </h2>
                     <div className="text-sm text-slate-500 mt-0.5">
-                      <span className="font-mono">{allFilteredTrips.length}</span> trains · <span className="font-mono">{filteredGroups.length}</span> destinations
+                      <span className="font-mono">{totalTrips}</span> trains · <span className="font-mono">{filteredGroups.length}</span> destinations
                     </div>
                   </div>
                   <TabsList className="bg-slate-100">
@@ -237,11 +264,11 @@ export default function Home() {
                 </TabsContent>
 
                 <TabsContent value="calendar">
-                  <CalendarView trips={allFilteredTrips} />
+                  {tab === "calendar" && <CalendarView trips={allFilteredTrips} />}
                 </TabsContent>
 
                 <TabsContent value="chart">
-                  <PeakHoursChart trips={allFilteredTrips} />
+                  {tab === "chart" && <PeakHoursChart trips={allFilteredTrips} />}
                 </TabsContent>
               </Tabs>
             </div>

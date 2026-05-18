@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { CalendarDays, Clock4, Train, Filter, RotateCw } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
@@ -7,7 +8,7 @@ const TIME_SLOTS = [
   { id: "evening", label: "Soir", from: 18, to: 24 },
 ];
 
-export default function FiltersPanel({ filters, onChange, hiddenCount, onResetHidden, totalDestinations }) {
+function FiltersPanel({ filters, onChange, hiddenCount, onResetHidden, totalDestinations }) {
   const set = (k, v) => onChange({ ...filters, [k]: v });
   return (
     <aside className="bg-white border border-slate-200 rounded-2xl p-5 sticky top-24" data-testid="filters-panel">
@@ -121,3 +122,5 @@ export default function FiltersPanel({ filters, onChange, hiddenCount, onResetHi
     </aside>
   );
 }
+
+export default memo(FiltersPanel);

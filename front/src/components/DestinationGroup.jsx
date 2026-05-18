@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { ChevronDown, ChevronUp, MapPin, EyeOff } from "lucide-react";
 import TrainCard from "@/components/TrainCard";
-export default function DestinationGroup({ group, onHide, defaultOpen = false }) {
+function DestinationGroup({ group, onHide, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   const [visibleCount, setVisibleCount] = useState(10);
   const visible = group.trips.slice(0, visibleCount);
@@ -67,3 +67,8 @@ export default function DestinationGroup({ group, onHide, defaultOpen = false })
     </div>
   );
 }
+
+export default memo(
+  DestinationGroup,
+  (prev, next) => prev.group === next.group && prev.onHide === next.onHide
+);

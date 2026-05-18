@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { ExternalLink, Train, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +38,7 @@ function formatFare(fareEur) {
   return `${fareEur.toFixed(2).replace(".", ",")}€`;
 }
 
-export default function TrainCard({ trip }) {
+function TrainCard({ trip }) {
   const style = TRAIN_TYPE_STYLES[trip.train_type] || TRAIN_TYPE_STYLES.TGV_INOUI;
   const imminent = isImminent(trip.date, trip.heure_depart);
   const dateObj = new Date(`${trip.date}T${trip.heure_depart}:00`);
@@ -108,3 +109,5 @@ export default function TrainCard({ trip }) {
     </div>
   );
 }
+
+export default memo(TrainCard);
