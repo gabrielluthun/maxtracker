@@ -67,7 +67,7 @@ export default function FiltersPanel({ filters, onChange, hiddenCount, onResetHi
               className={`px-2 py-2 rounded-lg border text-xs font-semibold transition-colors ${
                 filters.showInoui ? "bg-[#E11D48] text-white border-[#E11D48]" : "bg-white text-slate-600 border-slate-200"
               }`}
-            >TGV INOUI</button>
+            >TGV INOUI / OUIGO</button>
             <button
               onClick={() => set("showIntercites", !filters.showIntercites)}
               data-testid="filter-intercites"
