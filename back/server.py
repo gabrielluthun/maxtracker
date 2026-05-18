@@ -270,7 +270,7 @@ async def sync_trips() -> dict:
         axe = row.get("axe") or ""
         origine_iata = row.get("origine_iata") or ""
         destination_iata = row.get("destination_iata") or ""
-        train_type = classify_train_type(entity, axe, origine, destination)
+        train_type = classify_train_type(entity, axe, origine, destination, train_no)
         if train_type is None:
             continue
         dep_dt = f"{date}T{heure_depart}:00"
