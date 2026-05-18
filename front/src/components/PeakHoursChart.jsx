@@ -15,7 +15,7 @@ export default function PeakHoursChart({ trips }) {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5" data-testid="peak-hours-chart">
       <div className="flex items-baseline justify-between mb-4">
-        <h3 className="font-semibold text-lg text-slate-900">Heures à forte probabilité de 0€</h3>
+        <h3 className="font-semibold text-lg text-slate-900">Heures à forte éligibilité TGV Max</h3>
         <div className="text-xs text-slate-500">Répartition par heure de départ</div>
       </div>
       <div className="h-64">
@@ -24,10 +24,11 @@ export default function PeakHoursChart({ trips }) {
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748B" }} interval={1} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} />
             <Tooltip
-              contentStyle={{ background: "#0A2540", border: "none", borderRadius: 8, color: "white", fontSize: 12 }}
-              labelStyle={{ color: "white", fontWeight: 600 }}
-              cursor={{ fill: "rgba(10,37,64,0.05)" }}
-              formatter={(v) => [`${v} train${v > 1 ? "s" : ""}`, "À 0€"]}
+              contentStyle={{ background: "#0A2540", border: "none", borderRadius: 8, color: "#fff", fontSize: 12 }}
+              labelStyle={{ color: "#fff", fontWeight: 600 }}
+              itemStyle={{ color: "#E2E8F0" }}
+              cursor={{ fill: "rgba(10, 37, 64, 0.08)" }}
+              formatter={(v) => [`${v} train${v > 1 ? "s" : ""}`, "Éligibilité"]}
             />
             <Bar dataKey="count" radius={[6, 6, 0, 0]}>
               {data.map((d, i) => (

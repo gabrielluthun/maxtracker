@@ -70,7 +70,7 @@ export default function Home() {
       const info = await getSyncInfo();
       setSyncInfo(info);
       toast.success("Synchronisation effectuée");
-      if (origin) handleSearch(origin, true);
+      if (origin) handleSearch(origin);
     } catch {
       toast.error("Synchronisation impossible");
     } finally {
