@@ -57,11 +57,11 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
   return (
     <div className="w-full" ref={wrapRef}>
       <div className="bg-white rounded-2xl shadow-[0_24px_60px_-24px_rgba(10,37,64,0.25)] border border-slate-200 p-4 md:p-6">
-        <div className="flex flex-col md:flex-row gap-3 md:items-center">
-          <div className="flex-1 relative">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-              Gare de départ
-            </label>
+        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+          Gare de départ
+        </label>
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+          <div className="flex-1 min-w-0 relative">
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" strokeWidth={2.25} />
               <input
@@ -114,26 +114,23 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
             )}
           </div>
 
-          <div className="flex md:flex-col items-center justify-center gap-2 md:gap-0">
+          <div className="flex flex-row items-center gap-2 shrink-0">
             <button
               data-testid="swap-stations-btn"
               onClick={() => { /* swap is informational - we only do "from" search; provide nudge */ }}
               disabled
-              className="hidden md:flex items-center justify-center h-12 w-12 rounded-full border-2 border-slate-200 bg-white text-slate-300 cursor-not-allowed"
+              className="flex items-center justify-center h-14 w-14 shrink-0 rounded-full border-2 border-slate-200 bg-white text-slate-300 cursor-not-allowed"
               title="Inversion (saisissez la gare retour)"
             >
               <ArrowLeftRight className="h-5 w-5" />
             </button>
-          </div>
-
-          <div className="flex items-end gap-2">
             <button
               data-testid="search-submit-btn"
               onClick={() => origin && onSearch(origin)}
               disabled={!origin || loading}
-              className="h-14 px-8 rounded-xl bg-[#0A2540] hover:bg-[#173A5E] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold tracking-wide transition-colors flex items-center gap-2"
+              className="h-14 w-full sm:w-auto px-8 rounded-xl bg-[#0A2540] hover:bg-[#173A5E] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold tracking-wide transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap"
             >
-              <Search className="h-5 w-5" strokeWidth={2.5} />
+              <Search className="h-5 w-5 shrink-0" strokeWidth={2.5} />
               {loading ? "Recherche…" : "Trouver les 0€"}
             </button>
           </div>
