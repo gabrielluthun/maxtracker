@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Train, List, CalendarDays, BarChart3, Sparkles, AlertCircle, Inbox } from "lucide-react";
+import { List, CalendarDays, BarChart3, Sparkles, AlertCircle, Inbox } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import FiltersPanel from "@/components/FiltersPanel";
 import {
@@ -11,7 +11,9 @@ import {
 import DestinationGroup from "@/components/DestinationGroup";
 import CalendarView from "@/components/CalendarView";
 import PeakHoursChart from "@/components/PeakHoursChart";
+import AppHeader from "@/components/AppHeader";
 import SyncBadge from "@/components/SyncBadge";
+import { APP_VIEW } from "@/lib/appView";
 import Disclaimer from "@/components/Disclaimer";
 import WelcomeModal from "@/components/WelcomeModal";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -153,23 +155,10 @@ export default function Home() {
   return (
     <div className="min-h-screen hero-radial">
       <WelcomeModal />
-      {/* Header */}
-      <header className="glass sticky top-0 z-40 border-b border-slate-200/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-xl bg-[#0A2540] flex items-center justify-center">
-              <Train className="h-5 w-5 text-white" strokeWidth={2.5} />
-            </div>
-            <div className="leading-tight">
-              <div className="text-[18px] font-bold text-[#0A2540] tracking-tight" style={{ fontFamily: "'Outfit', sans-serif" }}>
-                MaxTracker
-              </div>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-semibold">TGV Max · 0€ tracker</div>
-            </div>
-          </div>
-          <SyncBadge info={syncInfo} onRefresh={onRefresh} refreshing={refreshing} />
-        </div>
-      </header>
+      <AppHeader
+        activeView={APP_VIEW.SEARCH}
+        trailing={<SyncBadge info={syncInfo} onRefresh={onRefresh} refreshing={refreshing} />}
+      />
 
       {/* Hero / Search */}
       <section className="relative">
