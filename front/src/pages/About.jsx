@@ -1,12 +1,14 @@
-import { ShieldAlert } from "lucide-react";
+import { ShieldAlert, Github, ExternalLink } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import { APP_VIEW } from "@/lib/appView";
+
+const GITHUB_REPO_URL = "https://github.com/gabrielluthun/tgvmax-platform";
 
 export default function About() {
   return (
     <div className="min-h-screen hero-radial" data-testid="about-page">
       <AppHeader activeView={APP_VIEW.ABOUT} />
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pb-16">
         <h1 className="text-3xl sm:text-4xl font-extrabold text-[#0A2540] tracking-tight">
           À propos
         </h1>
@@ -243,6 +245,38 @@ export default function About() {
                 </p>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section
+          id="contact"
+          className="mt-10 scroll-mt-24"
+          aria-labelledby="about-contact"
+          data-testid="about-section-contact"
+        >
+          <h2 id="about-contact" className="text-xl font-bold text-[#0A2540]">
+            Contact
+          </h2>
+          <div className="mt-4 space-y-4 text-slate-600 leading-relaxed">
+            <p>
+              MaxTracker est un projet ouvert. Pour consulter le code source, signaler un bug ou proposer une
+              amélioration :
+            </p>
+            <a
+              href={GITHUB_REPO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-[#0A2540] shadow-sm hover:border-slate-300 hover:bg-slate-50 transition-colors"
+              data-testid="about-github-link"
+            >
+              <Github className="h-5 w-5 shrink-0" aria-hidden />
+              <span>MaxTracker GitHub</span>
+              <ExternalLink className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+            </a>
+            <p className="text-sm text-slate-500">
+              Les retours se font via les issues GitHub du dépôt. Il n'y a pas de support commercial ni de lien avec la
+              SNCF pour les disponibilités ou les réservations.
+            </p>
           </div>
         </section>
       </main>
