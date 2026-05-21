@@ -17,4 +17,16 @@ jobs:
             echo "Secret RENDER_API_URL manquant. Définissez l'URL du backend Render (sans /api)."
             exit 1
           fi
-          curl -fsS --max-time 30 "${RENDER_API_URL%/}/api/"
+          url="${RENDER_API_URL%/}/api/"
+          echo "Ping: $url"
+        
+          for attempt in 1 2 3; do
+            if curl -fsS --max-time 120 "$url"; then
+              echo "OK (tentative $attempt)"
+              exit 0
+            fi
+            echo "Tentative $attempt échouée, nouvel essai dans 20 s..."
+            sleep 20
+          done
+          echo "Échec après 3 tentatives (service injoignable ou URL incorrecte)."
+          exit 1
