@@ -1,3 +1,4 @@
+import { ShieldAlert } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import { APP_VIEW } from "@/lib/appView";
 
@@ -197,6 +198,51 @@ export default function About() {
               Un billet peut être réservé entre deux synchronisations. Les places se libèrent aussi par vagues côté SNCF
               — l'absence de résultat aujourd'hui ne signifie pas qu'il n'y en aura pas demain.
             </p>
+          </div>
+        </section>
+
+        <section
+          id="avertissement"
+          className="mt-10 scroll-mt-24"
+          aria-labelledby="about-avertissement"
+          data-testid="about-section-avertissement"
+        >
+          <h2 id="about-avertissement" className="text-xl font-bold text-[#0A2540]">
+            Avertissement
+          </h2>
+          <div className="mt-4 rounded-2xl bg-slate-100 border border-slate-200 p-5 text-sm text-slate-600 leading-relaxed">
+            <div className="flex items-start gap-3">
+              <ShieldAlert className="h-5 w-5 text-slate-500 shrink-0 mt-0.5" aria-hidden />
+              <div className="space-y-3 min-w-0">
+                <p className="m-0">
+                  <strong className="text-slate-800">Service indépendant et non officiel.</strong> MaxTracker n'est pas
+                  affilié à la SNCF ni à SNCF Voyageurs. « SNCF », « TGV », « TGV Max », « MAX JEUNE », « MAX ACTIF » et
+                  « SNCF Connect » sont des marques déposées de leurs propriétaires respectifs.
+                </p>
+                <p className="m-0">
+                  MaxTracker est un outil de repérage fondé sur des données ouvertes. Il ne vend pas de billet, ne
+                  collecte aucun identifiant SNCF Connect, n'effectue aucune transaction et ne garantit ni la
+                  disponibilité ni le tarif affiché sur les canaux officiels.
+                </p>
+                <p className="m-0">
+                  L'utilisation du jeu de données SNCF est soumise aux conditions du{" "}
+                  <a
+                    href="https://data.sncf.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-[#0A2540]"
+                  >
+                    portail open data
+                  </a>
+                  . Les informations présentées sur ce site ne constituent pas un conseil de voyage ni une offre
+                  commerciale de transport.
+                </p>
+                <p className="m-0 text-slate-800 font-medium">
+                  Vérifiez systématiquement la disponibilité réelle et les conditions de votre abonnement sur SNCF
+                  Connect avant tout déplacement ou achat.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
       </main>
