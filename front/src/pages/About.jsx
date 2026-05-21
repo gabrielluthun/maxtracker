@@ -128,6 +128,77 @@ export default function About() {
             </div>
           </div>
         </section>
+
+        <section
+          id="les-donnees"
+          className="mt-10 scroll-mt-24"
+          aria-labelledby="about-les-donnees"
+          data-testid="about-section-donnees"
+        >
+          <h2 id="about-les-donnees" className="text-xl font-bold text-[#0A2540]">
+            Les données
+          </h2>
+          <div className="mt-4 space-y-4 text-slate-600 leading-relaxed">
+            <p>
+              Les trajets affichés proviennent du jeu de données ouvert{" "}
+              <a
+                href="https://data.sncf.com/explore/dataset/tgvmax/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-[#0A2540]"
+              >
+                « Disponibilités TGV Max »
+              </a>
+              , publié par <strong className="text-slate-800">SNCF Voyageurs</strong> sur la plateforme Opendatasoft,
+              sous la licence indiquée sur le portail open data.
+            </p>
+            <p>
+              Il s'agit d'un <strong className="text-slate-800">instantané national</strong> des créneaux encore
+              éligibles à la réservation MAX — pas d'un stock temps réel train par train. Le compteur affiché sur l'écran
+              Recherche (ex. « X trajets éligibles suivis en France ») reflète l'ensemble de la base indexée, pas
+              uniquement votre dernière recherche.
+            </p>
+
+            <ul className="space-y-3">
+              <li className="flex gap-3">
+                <span className="shrink-0 font-mono text-xs font-semibold text-[#0A2540] bg-slate-100 border border-slate-200 rounded px-2 py-1 h-fit">
+                  SNCF
+                </span>
+                <span>
+                  Publication d'une nouvelle vague de données{" "}
+                  <strong className="text-slate-800">chaque jour en début de matinée</strong> (aux alentours de 6 h 30).
+                  Ce n'est pas une mise à jour minute par minute.
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <span className="shrink-0 font-mono text-xs font-semibold text-[#0A2540] bg-slate-100 border border-slate-200 rounded px-2 py-1 h-fit">
+                  MaxTracker
+                </span>
+                <span>
+                  Import de ce flux environ <strong className="text-slate-800">toutes les 15 minutes</strong> lorsque le
+                  service est actif. La « dernière sync » du header correspond à ce dernier import — elle ne peut pas être
+                  plus récente que la publication SNCF.
+                </span>
+              </li>
+            </ul>
+
+            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900">
+              <p className="m-0">
+                <strong>Écarts possibles avec SNCF Connect.</strong> L'application officielle s'appuie sur des systèmes
+                privés (stock et tarifs en temps réel). MaxTracker n'utilise que le flux public : un train listé ici peut
+                ne plus être disponible sur Connect, et inversement.{" "}
+                <strong className="text-amber-950">
+                  Vérifiez toujours sur SNCF Connect avant tout déplacement.
+                </strong>
+              </p>
+            </div>
+
+            <p className="text-sm text-slate-500">
+              Un billet peut être réservé entre deux synchronisations. Les places se libèrent aussi par vagues côté SNCF
+              — l'absence de résultat aujourd'hui ne signifie pas qu'il n'y en aura pas demain.
+            </p>
+          </div>
+        </section>
       </main>
     </div>
   );
