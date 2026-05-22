@@ -1,7 +1,7 @@
 import { memo, useState } from "react";
 import { ChevronDown, ChevronUp, MapPin, EyeOff } from "lucide-react";
 import TrainCard from "@/components/TrainCard";
-import { formatTripDayLabel, getParisClock, groupTripsByDate } from "@/lib/tripTime";
+import { formatTripDayLabel, getParisClock, groupHasDepartureToday, groupTripsByDate } from "@/lib/tripTime";
 
 function DestinationGroup({ group, onHide, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -9,6 +9,7 @@ function DestinationGroup({ group, onHide, defaultOpen = false }) {
   const visible = group.trips.slice(0, visibleCount);
   const daySections = groupTripsByDate(visible);
   const today = getParisClock().today;
+  const hasTodayDeparture = groupHasDepartureToday(group.trips);
   const hasMore = group.trips.length > visibleCount;
 
   return (
@@ -23,7 +24,18 @@ function DestinationGroup({ group, onHide, defaultOpen = false }) {
             <MapPin className="h-5 w-5 text-[#0A2540]" strokeWidth={2.25} />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-lg text-slate-900 truncate">{group.destination_city}</h3>
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <h3 className="font-semibold text-lg text-slate-900 truncate">{group.destination_city}</h3>
+              {hasTodayDeparture && (
+                <span
+                  className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/30"
+                  data-testid={`today-badge-${group.destination_city}`}
+                  title="Au moins un train part aujourd'hui vers cette destination"
+                >
+                  Départ possible aujourd&apos;hui
+                </span>
+              )}
+            </div>
             <div className="text-xs text-slate-500 truncate">
               {group.destinations.length > 1 ? `${group.destinations.length} gares · ` : ""}
               <span className="font-mono">{group.trip_count}</span> trajet{group.trip_count > 1 ? "s" : ""} à 0€
