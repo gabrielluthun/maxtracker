@@ -12,6 +12,27 @@ export function getParisClock() {
   };
 }
 
+
+export function formatTripDayLabel(date) {
+  const label = new Date(`${date}T12:00:00`).toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+/** Regroupe des trajets triés par date en sections { date, trips }. */
+export function groupTripsByDate(trips) {
+  const sections = [];
+  for (const trip of trips) {
+    const last = sections[sections.length - 1];
+    if (last?.date === trip.date) last.trips.push(trip);
+    else sections.push({ date: trip.date, trips: [trip] });
+  }
+  return sections;
+}
+
 /** True si le départ (date + heure locales France) est déjà passé. */
 export function isDeparturePast(date, heureDepart, clock = getParisClock()) {
   const depTime = (heureDepart || "00:00").slice(0, 5);
@@ -32,6 +53,7 @@ export function enrichSearchGroups(groups) {
       return {
         ...t,
         _past: isDeparturePast(t.date, t.heure_depart, clock),
+        _today: t.date === clock.today,
         _weekend: day === 0 || day === 6,
         _slot: h < 12 ? "morning" : h < 18 ? "afternoon" : "evening",
       };
@@ -39,8 +61,14 @@ export function enrichSearchGroups(groups) {
   }));
 }
 
+/** True si le groupe contient au moins un départ non passé aujourd'hui (trajets déjà filtrés). */
+export function groupHasDepartureToday(trips) {
+  return trips.some((t) => t._today);
+}
+
 export function tripMatchesFilters(t, filters) {
   if (t._past) return false;
+  if (filters.departureTodayOnly && !t._today) return false;
   if (filters.weekendOnly && !t._weekend) return false;
   if (!filters.timeSlots[t._slot]) return false;
   if (t.train_type === "TGV_INOUI" && !filters.showInoui) return false;

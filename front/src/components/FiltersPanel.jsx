@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { CalendarDays, Clock4, Train, Filter, RotateCw } from "lucide-react";
+import { CalendarDays, Clock4, Train, Filter, RotateCw, Sun } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
 const TIME_SLOTS = [
@@ -18,6 +18,20 @@ function FiltersPanel({ filters, onChange, hiddenCount, onResetHidden, totalDest
       </div>
 
       <div className="space-y-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 font-medium text-slate-800">
+              <Sun className="h-4 w-4 text-[#10B981]" /> Départ aujourd&apos;hui
+            </div>
+            <div className="text-xs text-slate-500 mt-0.5">Un train part aujourd&apos;hui vers la destination</div>
+          </div>
+          <Switch
+            data-testid="filter-today"
+            checked={filters.departureTodayOnly}
+            onCheckedChange={(v) => set("departureTodayOnly", v)}
+          />
+        </div>
+
         {/* Weekend only */}
         <div className="flex items-center justify-between gap-3">
           <div>

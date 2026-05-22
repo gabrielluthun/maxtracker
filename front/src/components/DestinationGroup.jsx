@@ -1,10 +1,15 @@
 import { memo, useState } from "react";
 import { ChevronDown, ChevronUp, MapPin, EyeOff } from "lucide-react";
 import TrainCard from "@/components/TrainCard";
+import { formatTripDayLabel, getParisClock, groupHasDepartureToday, groupTripsByDate } from "@/lib/tripTime";
+
 function DestinationGroup({ group, onHide, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   const [visibleCount, setVisibleCount] = useState(10);
   const visible = group.trips.slice(0, visibleCount);
+  const daySections = groupTripsByDate(visible);
+  const today = getParisClock().today;
+  const hasTodayDeparture = groupHasDepartureToday(group.trips);
   const hasMore = group.trips.length > visibleCount;
 
   return (
@@ -19,7 +24,18 @@ function DestinationGroup({ group, onHide, defaultOpen = false }) {
             <MapPin className="h-5 w-5 text-[#0A2540]" strokeWidth={2.25} />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-lg text-slate-900 truncate">{group.destination_city}</h3>
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <h3 className="font-semibold text-lg text-slate-900 truncate">{group.destination_city}</h3>
+              {hasTodayDeparture && (
+                <span
+                  className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/30"
+                  data-testid={`today-badge-${group.destination_city}`}
+                  title="Au moins un train part aujourd'hui vers cette destination"
+                >
+                  Départ possible aujourd&apos;hui
+                </span>
+              )}
+            </div>
             <div className="text-xs text-slate-500 truncate">
               {group.destinations.length > 1 ? `${group.destinations.length} gares · ` : ""}
               <span className="font-mono">{group.trip_count}</span> trajet{group.trip_count > 1 ? "s" : ""} à 0€
@@ -50,8 +66,32 @@ function DestinationGroup({ group, onHide, defaultOpen = false }) {
               ))}
             </div>
           )}
-          <div className="space-y-3">
-            {visible.map((t) => <TrainCard key={t.id} trip={t} />)}
+          <div className="space-y-5">
+            {daySections.map((day) => (
+              <section key={day.date} data-testid={`day-section-${day.date}`}>
+                <div
+                  className="-mx-5 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-y border-slate-200 bg-slate-50 px-5 py-3"
+                  data-testid={`day-header-${day.date}`}
+                >
+                  <h4 className="font-semibold text-base uppercase tracking-[0.14em] text-slate-800">
+                    {formatTripDayLabel(day.date)}
+                  </h4>
+                  {day.date === today && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#10B981]">
+                      Aujourd&apos;hui
+                    </span>
+                  )}
+                  <span className="ml-auto text-xs text-slate-500 tabular-nums">
+                    {day.trips.length} trajet{day.trips.length > 1 ? "s" : ""}
+                  </span>
+                </div>
+                <div className="space-y-3 pt-3">
+                  {day.trips.map((t) => (
+                    <TrainCard key={t.id} trip={t} />
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
           {hasMore && (
             <button

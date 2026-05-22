@@ -1,5 +1,31 @@
 import { ShieldAlert, Github, ExternalLink } from "lucide-react";
+
 const GITHUB_REPO_URL = "https://github.com/gabrielluthun/tgvmax-platform";
+
+const ABOUT_FILTERS = [
+  {
+    name: "Départ aujourd'hui",
+    effect:
+      "Ne conserve que les trajets dont la date de départ est aujourd'hui (fuseau Europe/Paris). Les départs déjà passés sont toujours exclus.",
+  },
+  {
+    name: "Week-end uniquement",
+    effect: "Samedis et dimanches seulement.",
+  },
+  {
+    name: "Créneaux horaires",
+    effect: "Matin (avant 12 h), après-midi (12 h–18 h), soir (à partir de 18 h). Au moins un créneau doit rester actif.",
+  },
+  {
+    name: "Type de train",
+    effect: "TGV INOUI / OUIGO, Intercités, Intercités de nuit. Au moins un type doit rester actif.",
+  },
+  {
+    name: "Masquer une destination",
+    effect:
+      "Retire une ville de vos résultats (stockage local). Réversible via « Réafficher tout » dans le panneau filtres.",
+  },
+];
 
 export default function About() {
   return (
@@ -64,48 +90,105 @@ export default function About() {
               canal officiel.
             </p>
 
-            <ol className="space-y-4 list-decimal list-outside ml-5 marker:font-semibold marker:text-[#0A2540] dark:marker:text-slate-300">
+            <ol className="space-y-6 list-decimal list-outside ml-5 marker:font-semibold marker:text-[#0A2540] dark:marker:text-slate-300">
               <li className="pl-1">
-                <strong className="text-slate-800">Choisissez votre gare de départ.</strong> L'autocomplétion se
-                déclenche à partir de 3 lettres. Vous pouvez enregistrer des gares en favoris (stockées localement sur
-                votre navigateur) pour relancer une recherche en un clic.
+                <strong className="block text-slate-800 mb-1.5">Choisissez votre gare de départ.</strong>
+                <p className="m-0 leading-relaxed">
+                  L&apos;autocomplétion se déclenche à partir de 3 lettres. Vous pouvez enregistrer des gares en favoris
+                  (stockées localelement sur votre navigateur) pour relancer une recherche en un clic.
+                </p>
               </li>
               <li className="pl-1">
-                <strong className="text-slate-800">Lancez la recherche.</strong> MaxTracker interroge sa base, alimentée
-                par les données ouvertes SNCF, et affiche tous les trajets éligibles trouvés depuis cette gare. Si la
-                gare n'est pas desservie par l'offre TGV Max, un message vous l'indique ; s'il n'y a aucun créneau à 0 €
-                pour l'instant, l'app vous invite à réessayer après la prochaine mise à jour.
+                <strong className="block text-slate-800 mb-1.5">Lancez la recherche.</strong>
+                <p className="m-0 leading-relaxed">
+                  MaxTracker interroge sa base, alimentée par les données ouvertes SNCF, et affiche tous les trajets
+                  éligibles trouvés depuis cette gare. Si la gare n&apos;est pas desservie par l&apos;offre TGV Max, un
+                  message vous l&apos;indique ; s&apos;il n&apos;y a aucun créneau à 0 € pour l&apos;instant, l&apos;app
+                  vous invite à réessayer après la prochaine mise à jour.
+                </p>
               </li>
               <li className="pl-1">
-                <strong className="text-slate-800">Explorez les destinations.</strong> Les trains sont regroupés par
-                ville d'arrivée. Chaque carte indique la date, l'heure, le type de train (TGV INOUI, Intercités,
-                Intercités de nuit) et un lien vers SNCF Connect. Le badge{" "}
-                <strong className="text-slate-800">« Imminent »</strong> signale un départ dans moins de 4 heures.
+                <strong className="block text-slate-800 mb-1.5">Explorez les destinations.</strong>
+                <p className="m-0 leading-relaxed">
+                  Les trains sont regroupés par ville d&apos;arrivée. Le badge{" "}
+                  <strong className="text-slate-800">« Départ possible aujourd&apos;hui »</strong> indique qu&apos;au
+                  moins un train part encore vers cette destination le jour même. Chaque trajet affiche la date,
+                  l&apos;heure, le type de train (TGV INOUI, Intercités, Intercités de nuit) et un lien vers SNCF
+                  Connect. Le badge <strong className="text-slate-800">« Imminent »</strong> signale un départ dans
+                  moins de 4 heures.
+                </p>
               </li>
               <li className="pl-1">
-                <strong className="text-slate-800">Affinez avec les filtres.</strong> Ciblez les week-ends uniquement,
-                un créneau (matin, après-midi, soir), un type de train, ou les trajets sans correspondance. Vous pouvez
-                aussi masquer une destination pour ne plus la voir dans vos résultats (réversible depuis le panneau
-                filtres).
+                <strong className="block text-slate-800 mb-1.5">Affinez avec les filtres.</strong>
+                <p className="m-0 leading-relaxed">
+                  Le panneau à gauche des résultats restreint la liste ; le détail de chaque option est dans le tableau
+                  ci-dessous.
+                </p>
               </li>
               <li className="pl-1">
-                <strong className="text-slate-800">Changez de vue selon votre besoin.</strong> La vue{" "}
-                <strong className="text-slate-800">Liste</strong> compare les destinations ; le{" "}
-                <strong className="text-slate-800">Calendrier</strong> montre combien de trains partent chaque jour sur
-                30 jours ; le graphique <strong className="text-slate-800">Pics horaires</strong> met en évidence les
-                heures les plus fournies.
+                <strong className="block text-slate-800 mb-1.5">Changez de vue selon votre besoin.</strong>
+                <p className="m-0 leading-relaxed">
+                  La vue <strong className="text-slate-800">Liste</strong> compare les destinations ; le{" "}
+                  <strong className="text-slate-800">Calendrier</strong> montre combien de trains partent chaque jour sur
+                  30 jours ; le graphique <strong className="text-slate-800">Pics horaires</strong> met en évidence les
+                  heures les plus fournies.
+                </p>
               </li>
               <li className="pl-1">
-                <strong className="text-slate-800">Réservez sur SNCF Connect.</strong> MaxTracker ne finalise jamais la
-                vente : chaque trajet ouvre SNCF Connect pour confirmer que le billet est encore disponible et à 0 €
-                selon votre abonnement, puis effectuer la réservation.
+                <strong className="block text-slate-800 mb-1.5">Réservez sur SNCF Connect.</strong>
+                <p className="m-0 leading-relaxed">
+                  MaxTracker ne finalise jamais la vente : chaque trajet ouvre SNCF Connect pour confirmer que le billet
+                  est encore disponible et à 0 € selon votre abonnement, puis effectuer la réservation.
+                </p>
               </li>
             </ol>
+
+            <div data-testid="about-filters-table">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-3">
+                Les filtres
+              </h3>
+              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                <table className="w-full text-sm text-left">
+                  <caption className="sr-only">
+                    Filtres et actions disponibles dans MaxTracker
+                  </caption>
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-800">
+                      <th scope="col" className="px-4 py-3 font-semibold w-[11rem] sm:w-[13rem]">
+                        Filtre
+                      </th>
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        Effet
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {ABOUT_FILTERS.map((row) => (
+                      <tr key={row.name} className="text-slate-600">
+                        <th scope="row" className="px-4 py-3 font-medium text-slate-800 align-top">
+                          {row.name}
+                        </th>
+                        <td className="px-4 py-3 align-top leading-relaxed">{row.effect}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-3 text-sm text-slate-600 leading-relaxed">
+                Les recherches actuelles ne couvrent que les trajets <strong className="text-slate-800">sans
+                correspondance</strong>. La prise en charge des parcours <strong className="text-slate-800">avec
+                correspondance</strong> — et un filtre dédié — sera ajoutée dans une prochaine version.
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                Le badge <strong className="text-slate-700">« Départ possible aujourd&apos;hui »</strong> sur une
+                destination reprend la même logique que le filtre homonyme, sans ouvrir la carte.
+              </p>
+            </div>
 
             <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm">
               <p className="m-0">
                 <strong className="text-slate-800">Fenêtre de 30 jours.</strong> Seuls les départs des 30 prochains
-                jours sont indexés — c'est la période couverte par l'offre TGV Max et par le jeu de données utilisé.
+                jours sont indexés : c'est la période couverte par l'offre TGV Max et par le jeu de données utilisé.
                 Un train affiché ici est <strong className="text-slate-800">éligible selon l'open data</strong>, pas une
                 garantie de place encore libre au moment où vous réservez.
               </p>
