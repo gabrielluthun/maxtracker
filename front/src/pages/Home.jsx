@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Train, List, CalendarDays, BarChart3, Sparkles, AlertCircle, Inbox } from "lucide-react";
+import { List, CalendarDays, BarChart3, Sparkles, AlertCircle, Inbox } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import FiltersPanel from "@/components/FiltersPanel";
 import {
@@ -11,12 +11,11 @@ import {
 import DestinationGroup from "@/components/DestinationGroup";
 import CalendarView from "@/components/CalendarView";
 import PeakHoursChart from "@/components/PeakHoursChart";
-import SyncBadge from "@/components/SyncBadge";
 import Disclaimer from "@/components/Disclaimer";
 import WelcomeModal from "@/components/WelcomeModal";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { searchTrips, getSyncInfo, triggerSync } from "@/lib/api";
+import { searchTrips } from "@/lib/api";
 import { getHidden, unhideDestination, hideDestination } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
@@ -32,12 +31,10 @@ const defaultFilters = {
   directOnly: false,
 };
 
-export default function Home() {
+export default function Home({ syncInfo, registerRerunSearch }) {
   const [origin, setOrigin] = useState(null);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [syncInfo, setSyncInfo] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
   const [filters, setFilters] = useState(defaultFilters);
   const [animateResults, setAnimateResults] = useState(false);
   const [hidden, setHidden] = useState(getHidden());
@@ -48,13 +45,7 @@ export default function Home() {
     setFilters(next);
   };
 
-  useEffect(() => {
-    getSyncInfo().then(setSyncInfo).catch(() => {});
-    const id = setInterval(() => getSyncInfo().then(setSyncInfo).catch(() => {}), 60000);
-    return () => clearInterval(id);
-  }, []);
-
-  const handleSearch = async (station, freshPrices = false) => {
+  const handleSearch = useCallback(async (station, freshPrices = false) => {
     if (!station || !station.raw) {
       toast.error("Sélectionnez une gare valide");
       return;
@@ -75,22 +66,14 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await triggerSync();
-      const info = await getSyncInfo();
-      setSyncInfo(info);
-      toast.success("Synchronisation effectuée");
+  useEffect(() => {
+    registerRerunSearch?.(() => {
       if (origin) handleSearch(origin);
-    } catch {
-      toast.error("Synchronisation impossible");
-    } finally {
-      setRefreshing(false);
-    }
-  };
+    });
+    return () => registerRerunSearch?.(null);
+  }, [origin, handleSearch, registerRerunSearch]);
 
   const preparedGroups = useMemo(
     () => enrichSearchGroups(data?.groups),
@@ -151,25 +134,8 @@ export default function Home() {
   const onResetHidden = () => { localStorage.removeItem("mt_hidden_destinations"); setHidden([]); };
 
   return (
-    <div className="min-h-screen hero-radial">
+    <>
       <WelcomeModal />
-      {/* Header */}
-      <header className="glass sticky top-0 z-40 border-b border-slate-200/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-xl bg-[#0A2540] flex items-center justify-center">
-              <Train className="h-5 w-5 text-white" strokeWidth={2.5} />
-            </div>
-            <div className="leading-tight">
-              <div className="text-[18px] font-bold text-[#0A2540] tracking-tight" style={{ fontFamily: "'Outfit', sans-serif" }}>
-                MaxTracker
-              </div>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-semibold">TGV Max · 0€ tracker</div>
-            </div>
-          </div>
-          <SyncBadge info={syncInfo} onRefresh={onRefresh} refreshing={refreshing} />
-        </div>
-      </header>
 
       {/* Hero / Search */}
       <section className="relative">
@@ -277,7 +243,7 @@ export default function Home() {
 
         <Disclaimer />
       </section>
-    </div>
+    </>
   );
 }
 
