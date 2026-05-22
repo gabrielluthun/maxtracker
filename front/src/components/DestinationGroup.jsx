@@ -1,10 +1,14 @@
 import { memo, useState } from "react";
 import { ChevronDown, ChevronUp, MapPin, EyeOff } from "lucide-react";
 import TrainCard from "@/components/TrainCard";
+import { formatTripDayLabel, getParisClock, groupTripsByDate } from "@/lib/tripTime";
+
 function DestinationGroup({ group, onHide, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   const [visibleCount, setVisibleCount] = useState(10);
   const visible = group.trips.slice(0, visibleCount);
+  const daySections = groupTripsByDate(visible);
+  const today = getParisClock().today;
   const hasMore = group.trips.length > visibleCount;
 
   return (
@@ -50,8 +54,32 @@ function DestinationGroup({ group, onHide, defaultOpen = false }) {
               ))}
             </div>
           )}
-          <div className="space-y-3">
-            {visible.map((t) => <TrainCard key={t.id} trip={t} />)}
+          <div className="space-y-5">
+            {daySections.map((day) => (
+              <section key={day.date} data-testid={`day-section-${day.date}`}>
+                <div
+                  className="-mx-5 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-y border-slate-200 bg-slate-50 px-5 py-3"
+                  data-testid={`day-header-${day.date}`}
+                >
+                  <h4 className="font-semibold text-base uppercase tracking-[0.14em] text-slate-800">
+                    {formatTripDayLabel(day.date)}
+                  </h4>
+                  {day.date === today && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#10B981]">
+                      Aujourd&apos;hui
+                    </span>
+                  )}
+                  <span className="ml-auto text-xs text-slate-500 tabular-nums">
+                    {day.trips.length} trajet{day.trips.length > 1 ? "s" : ""}
+                  </span>
+                </div>
+                <div className="space-y-3 pt-3">
+                  {day.trips.map((t) => (
+                    <TrainCard key={t.id} trip={t} />
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
           {hasMore && (
             <button
