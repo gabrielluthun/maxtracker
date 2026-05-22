@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { ExternalLink, Train, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatTripDayLabel } from "@/lib/tripTime";
 
 const TRAIN_TYPE_STYLES = {
   TGV_INOUI: { ribbon: "bg-[#E11D48]", badge: "bg-[#E11D48] text-white", label: "TGV INOUI" },
@@ -41,8 +42,7 @@ function formatFare(fareEur) {
 function TrainCard({ trip }) {
   const style = TRAIN_TYPE_STYLES[trip.train_type] || TRAIN_TYPE_STYLES.TGV_INOUI;
   const imminent = isImminent(trip.date, trip.heure_depart);
-  const dateObj = new Date(`${trip.date}T${trip.heure_depart}:00`);
-  const dayLabel = dateObj.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+  const dayLabel = formatTripDayLabel(trip.date);
   const fare = trip.fare_eur ?? 0;
 
   return (
@@ -54,7 +54,6 @@ function TrainCard({ trip }) {
 
       <div className="flex-1 p-5 grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr_auto] gap-4 sm:items-center">
         <div>
-          <div className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">{dayLabel}</div>
           <div className="font-mono text-2xl font-semibold text-slate-900 tabular-nums">{fmtHHmm(trip.heure_depart)}</div>
           <div className="text-sm text-slate-600 mt-0.5 line-clamp-1">{trip.origine}</div>
         </div>
