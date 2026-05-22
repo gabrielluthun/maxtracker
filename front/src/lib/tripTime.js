@@ -53,6 +53,7 @@ export function enrichSearchGroups(groups) {
       return {
         ...t,
         _past: isDeparturePast(t.date, t.heure_depart, clock),
+        _today: t.date === clock.today,
         _weekend: day === 0 || day === 6,
         _slot: h < 12 ? "morning" : h < 18 ? "afternoon" : "evening",
       };
@@ -60,8 +61,14 @@ export function enrichSearchGroups(groups) {
   }));
 }
 
+/** True si le groupe contient au moins un départ non passé aujourd'hui (trajets déjà filtrés). */
+export function groupHasDepartureToday(trips) {
+  return trips.some((t) => t._today);
+}
+
 export function tripMatchesFilters(t, filters) {
   if (t._past) return false;
+  if (filters.departureTodayOnly && !t._today) return false;
   if (filters.weekendOnly && !t._weekend) return false;
   if (!filters.timeSlots[t._slot]) return false;
   if (t.train_type === "TGV_INOUI" && !filters.showInoui) return false;
