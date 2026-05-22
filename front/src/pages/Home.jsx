@@ -23,6 +23,7 @@ const HERO_BG = "https://static.prod-images.emergentagent.com/jobs/f74c49b6-18a0
 const EMPTY_BG = "https://static.prod-images.emergentagent.com/jobs/f74c49b6-18a0-4cb7-95f4-30d605669f9b/images/a8fc6da684e5f05873d772644a95f43d0c632d9f05c9468e3746d24581b9fbec.png";
 
 const defaultFilters = {
+  departureTodayOnly: false,
   weekendOnly: false,
   timeSlots: { morning: true, afternoon: true, evening: true },
   showInoui: true,
@@ -272,7 +273,7 @@ function EmptyHero() {
           <li className="flex items-start gap-2"><span className="text-[#10B981] font-bold">→</span> Regroupement intelligent par ville</li>
           <li className="flex items-start gap-2"><span className="text-[#10B981] font-bold">→</span> Vue Calendrier des 30 jours</li>
           <li className="flex items-start gap-2"><span className="text-[#10B981] font-bold">→</span> Lien direct vers SNCF Connect</li>
-          <li className="flex items-start gap-2"><span className="text-[#10B981] font-bold">→</span> Filtres week-end, créneaux, types de train</li>
+          <li className="flex items-start gap-2"><span className="text-[#10B981] font-bold">→</span> Badge et filtre « départ possible aujourd&apos;hui », week-end, créneaux</li>
         </ul>
       </div>
       <div className="rounded-xl overflow-hidden border border-slate-100 bg-slate-50 aspect-[4/3]">
