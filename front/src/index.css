@@ -30,6 +30,26 @@
     --chart-5: 200 95% 39%;
     --radius: 0.75rem;
   }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 96%;
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 210 40% 96%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 160 84% 39%;
+    --accent-foreground: 0 0% 100%;
+    --border: 217 33% 22%;
+    --input: 217 33% 22%;
+    --ring: 160 84% 39%;
+  }
 }
 
 @layer base {
@@ -55,11 +75,54 @@
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
   }
+  .dark .glass {
+    background: rgba(15, 23, 42, 0.82);
+  }
   .hero-radial {
     background:
       radial-gradient(1000px 500px at 80% -10%, rgba(16,185,129,0.10), transparent 60%),
       radial-gradient(700px 400px at -10% 0%, rgba(10,37,64,0.06), transparent 60%),
       #FAFAFA;
+  }
+  .dark .hero-radial {
+    background:
+      radial-gradient(1000px 500px at 80% -10%, rgba(16,185,129,0.12), transparent 60%),
+      radial-gradient(700px 400px at -10% 0%, rgba(30,58,95,0.35), transparent 60%),
+      hsl(222 47% 7%);
+  }
+  .dark .bg-white { @apply bg-slate-900; }
+  .dark .bg-slate-50 { @apply bg-slate-800/80; }
+  .dark .bg-slate-100 { @apply bg-slate-800; }
+  .dark .bg-emerald-50 { @apply bg-emerald-950/50; }
+  .dark .bg-amber-50 { @apply bg-amber-950/40; }
+  .dark .border-slate-100 { @apply border-slate-700; }
+  .dark .border-slate-200 { @apply border-slate-700; }
+  .dark .border-slate-200\/60 { @apply border-slate-700/60; }
+  .dark .border-emerald-100 { @apply border-emerald-900/60; }
+  .dark .border-emerald-200 { @apply border-emerald-800/50; }
+  .dark .border-amber-200 { @apply border-amber-800/50; }
+  .dark .text-slate-900 { @apply text-slate-100; }
+  .dark .text-slate-800 { @apply text-slate-200; }
+  .dark .text-slate-700 { @apply text-slate-300; }
+  .dark .text-slate-600 { @apply text-slate-300; }
+  .dark .text-slate-500 { @apply text-slate-400; }
+  .dark .text-amber-800 { @apply text-amber-200; }
+  .dark .text-amber-900 { @apply text-amber-100; }
+  .dark .text-emerald-800 { @apply text-emerald-300; }
+  .dark [class*="0A2540"] { color: rgb(241 245 249); }
+  .dark .bg-\[\#0A2540\]\/5 { background-color: rgb(51 65 85 / 0.45); }
+  .dark .hover\:bg-slate-50:hover { @apply bg-slate-800; }
+  .dark .hover\:bg-slate-100:hover { @apply bg-slate-700; }
+  .dark .hover\:text-slate-700:hover { @apply text-slate-200; }
+  .dark .hover\:border-slate-300:hover { @apply border-slate-600; }
+  .dark .border-dashed.border-slate-200 { @apply border-slate-600; }
+  .dark .group-hover\:text-slate-600:is(:where(.group):hover *) { @apply text-slate-300; }
+  .dark .group-hover\:bg-slate-200\/80:is(:where(.group):hover *) { background-color: rgb(51 65 85 / 0.8); }
+  .dark .shadow-\[0_24px_60px_-24px_rgba\(10\,37\,64\,0\.25\)\] {
+    box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.45);
+  }
+  .dark .card-hover:hover {
+    box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.35);
   }
   .ticket-strip {
     background-image: radial-gradient(circle at 8px 0, transparent 4px, currentColor 4.5px);
