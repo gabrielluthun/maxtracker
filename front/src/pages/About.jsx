@@ -1,14 +1,12 @@
 import { ShieldAlert, Github, ExternalLink } from "lucide-react";
-import AppHeader from "@/components/AppHeader";
-import { APP_VIEW } from "@/lib/appView";
-
 const GITHUB_REPO_URL = "https://github.com/gabrielluthun/tgvmax-platform";
 
 export default function About() {
   return (
-    <div className="min-h-screen hero-radial" data-testid="about-page">
-      <AppHeader activeView={APP_VIEW.ABOUT} />
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pb-16">
+    <main
+      className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pb-16"
+      data-testid="about-page"
+    >
         <h1 className="text-3xl sm:text-4xl font-extrabold text-[#0A2540] tracking-tight">
           À propos
         </h1>
@@ -279,7 +277,6 @@ export default function About() {
             </p>
           </div>
         </section>
-      </main>
-    </div>
+    </main>
   );
 }

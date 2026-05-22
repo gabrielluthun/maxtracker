@@ -11,14 +11,11 @@ import {
 import DestinationGroup from "@/components/DestinationGroup";
 import CalendarView from "@/components/CalendarView";
 import PeakHoursChart from "@/components/PeakHoursChart";
-import AppHeader from "@/components/AppHeader";
-import SyncBadge from "@/components/SyncBadge";
-import { APP_VIEW } from "@/lib/appView";
 import Disclaimer from "@/components/Disclaimer";
 import WelcomeModal from "@/components/WelcomeModal";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { searchTrips, getSyncInfo, triggerSync } from "@/lib/api";
+import { searchTrips } from "@/lib/api";
 import { getHidden, unhideDestination, hideDestination } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
@@ -34,12 +31,10 @@ const defaultFilters = {
   directOnly: false,
 };
 
-export default function Home() {
+export default function Home({ syncInfo, registerRerunSearch }) {
   const [origin, setOrigin] = useState(null);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [syncInfo, setSyncInfo] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
   const [filters, setFilters] = useState(defaultFilters);
   const [animateResults, setAnimateResults] = useState(false);
   const [hidden, setHidden] = useState(getHidden());
@@ -50,13 +45,7 @@ export default function Home() {
     setFilters(next);
   };
 
-  useEffect(() => {
-    getSyncInfo().then(setSyncInfo).catch(() => {});
-    const id = setInterval(() => getSyncInfo().then(setSyncInfo).catch(() => {}), 60000);
-    return () => clearInterval(id);
-  }, []);
-
-  const handleSearch = async (station, freshPrices = false) => {
+  const handleSearch = useCallback(async (station, freshPrices = false) => {
     if (!station || !station.raw) {
       toast.error("Sélectionnez une gare valide");
       return;
@@ -77,22 +66,14 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await triggerSync();
-      const info = await getSyncInfo();
-      setSyncInfo(info);
-      toast.success("Synchronisation effectuée");
+  useEffect(() => {
+    registerRerunSearch?.(() => {
       if (origin) handleSearch(origin);
-    } catch {
-      toast.error("Synchronisation impossible");
-    } finally {
-      setRefreshing(false);
-    }
-  };
+    });
+    return () => registerRerunSearch?.(null);
+  }, [origin, handleSearch, registerRerunSearch]);
 
   const preparedGroups = useMemo(
     () => enrichSearchGroups(data?.groups),
@@ -153,12 +134,8 @@ export default function Home() {
   const onResetHidden = () => { localStorage.removeItem("mt_hidden_destinations"); setHidden([]); };
 
   return (
-    <div className="min-h-screen hero-radial">
+    <>
       <WelcomeModal />
-      <AppHeader
-        activeView={APP_VIEW.SEARCH}
-        trailing={<SyncBadge info={syncInfo} onRefresh={onRefresh} refreshing={refreshing} />}
-      />
 
       {/* Hero / Search */}
       <section className="relative">
@@ -266,7 +243,7 @@ export default function Home() {
 
         <Disclaimer />
       </section>
-    </div>
+    </>
   );
 }
 
