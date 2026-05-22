@@ -4,7 +4,7 @@ const GITHUB_REPO_URL = "https://github.com/gabrielluthun/tgvmax-platform";
 export default function About() {
   return (
     <main
-      className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pb-16"
+      className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pb-16"
       data-testid="about-page"
     >
         <h1 className="text-3xl sm:text-4xl font-extrabold text-[#0A2540] tracking-tight">
@@ -64,7 +64,7 @@ export default function About() {
               canal officiel.
             </p>
 
-            <ol className="space-y-4 list-decimal list-outside ml-5 marker:font-semibold marker:text-[#0A2540]">
+            <ol className="space-y-4 list-decimal list-outside ml-5 marker:font-semibold marker:text-[#0A2540] dark:marker:text-slate-300">
               <li className="pl-1">
                 <strong className="text-slate-800">Choisissez votre gare de départ.</strong> L'autocomplétion se
                 déclenche à partir de 3 lettres. Vous pouvez enregistrer des gares en favoris (stockées localement sur

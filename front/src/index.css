@@ -94,20 +94,23 @@
   .dark .bg-slate-50 { @apply bg-slate-800/80; }
   .dark .bg-slate-100 { @apply bg-slate-800; }
   .dark .bg-emerald-50 { @apply bg-emerald-950/50; }
-  .dark .bg-amber-50 { @apply bg-amber-950/40; }
+  .dark .bg-amber-50 { @apply bg-slate-800/90; }
+  .dark .bg-amber-100 { @apply bg-slate-700/80; }
   .dark .border-slate-100 { @apply border-slate-700; }
   .dark .border-slate-200 { @apply border-slate-700; }
   .dark .border-slate-200\/60 { @apply border-slate-700/60; }
   .dark .border-emerald-100 { @apply border-emerald-900/60; }
   .dark .border-emerald-200 { @apply border-emerald-800/50; }
-  .dark .border-amber-200 { @apply border-amber-800/50; }
+  .dark .border-amber-200 { @apply border-amber-500/35; }
   .dark .text-slate-900 { @apply text-slate-100; }
   .dark .text-slate-800 { @apply text-slate-200; }
   .dark .text-slate-700 { @apply text-slate-300; }
   .dark .text-slate-600 { @apply text-slate-300; }
   .dark .text-slate-500 { @apply text-slate-400; }
-  .dark .text-amber-800 { @apply text-amber-200; }
-  .dark .text-amber-900 { @apply text-amber-100; }
+  .dark .text-amber-600 { @apply text-amber-400; }
+  .dark .text-amber-800 { @apply text-amber-200/90; }
+  .dark .text-amber-900 { @apply text-slate-200; }
+  .dark .text-amber-950 { @apply text-amber-200; }
   .dark .text-emerald-800 { @apply text-emerald-300; }
   .dark [class*="0A2540"] { color: rgb(241 245 249); }
   .dark .bg-\[\#0A2540\]\/5 { background-color: rgb(51 65 85 / 0.45); }
