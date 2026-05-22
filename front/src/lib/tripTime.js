@@ -12,6 +12,27 @@ export function getParisClock() {
   };
 }
 
+
+export function formatTripDayLabel(date) {
+  const label = new Date(`${date}T12:00:00`).toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+/** Regroupe des trajets triés par date en sections { date, trips }. */
+export function groupTripsByDate(trips) {
+  const sections = [];
+  for (const trip of trips) {
+    const last = sections[sections.length - 1];
+    if (last?.date === trip.date) last.trips.push(trip);
+    else sections.push({ date: trip.date, trips: [trip] });
+  }
+  return sections;
+}
+
 /** True si le départ (date + heure locales France) est déjà passé. */
 export function isDeparturePast(date, heureDepart, clock = getParisClock()) {
   const depTime = (heureDepart || "00:00").slice(0, 5);
