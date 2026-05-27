@@ -1,0 +1,118 @@
+name: Feature request
+description: Propose an enhancement or a new feature
+title: "[FEATURE] "
+labels:
+  - enhancement
+  - triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci d'ajouter assez de détails pour évaluer l'impact, le périmètre et la priorité.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problème à résoudre
+      description: Quel point de douleur rencontrez-vous ?
+      placeholder: Décrivez la limitation actuelle.
+    validations:
+      required: true
+
+  - type: textarea
+    id: business-context
+    attributes:
+      label: Contexte métier
+      description: Pourquoi est-ce important d'un point de vue produit/utilisateur ?
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: audience
+    attributes:
+      label: Utilisateurs concernés
+      options:
+        - label: Utilisateurs finaux
+        - label: Équipe support
+        - label: Équipe produit
+        - label: Équipe engineering
+        - label: Autres parties prenantes
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Solution proposée
+      placeholder: Décrivez le comportement cible et le parcours utilisateur.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagées
+      placeholder: Quelles autres options avez-vous évaluées ?
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Critères d'acceptation
+      description: Utilisez un format checklist.
+      placeholder: |
+        - [ ] Critère 1
+        - [ ] Critère 2
+        - [ ] Critère 3
+    validations:
+      required: true
+
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Hors périmètre
+      description: Listez explicitement ce qui ne doit PAS être inclus.
+
+  - type: dropdown
+    id: technical-impact
+    attributes:
+      label: Impact technique estimé
+      options:
+        - Faible
+        - Moyen
+        - Élevé
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: technical-areas
+    attributes:
+      label: Composants potentiellement impactés
+      options:
+        - label: UI / UX
+        - label: Services backend
+        - label: Contrats API
+        - label: Base de données / schéma
+        - label: Sécurité
+        - label: Performance
+        - label: Observabilité / monitoring
+
+  - type: textarea
+    id: risks-dependencies
+    attributes:
+      label: Risques et dépendances
+      placeholder: Dépendances externes, contraintes de migration, risques connus.
+
+  - type: textarea
+    id: validation-plan
+    attributes:
+      label: Plan de validation
+      description: Comment vérifiera-t-on le succès ?
+      placeholder: Scénarios de test, métriques, vérifications de rollout.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Confirmation
+      options:
+        - label: J'ai vérifié les issues existantes et je n'ai pas trouvé de doublon.
+          required: true

@@ -1,0 +1,125 @@
+name: Bug report
+description: Report an incorrect behavior
+title: "[BUG] "
+labels:
+  - bug
+  - triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci pour votre signalement. Merci de remplir ce formulaire le plus précisément possible.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Résumé
+      description: Description claire et concise du bug.
+      placeholder: Qu'est-ce qui ne fonctionne pas ?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Sévérité
+      description: À quel point ce problème est critique ?
+      options:
+        - Bloquant (production inutilisable)
+        - Majeur (fonctionnalité clé dégradée)
+        - Mineur (contournement possible)
+        - Cosmétique
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Fréquence
+      options:
+        - Toujours (100 %)
+        - Intermittent
+        - Rare
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: impacted-area
+    attributes:
+      label: Zone(s) impactée(s)
+      options:
+        - label: Frontend
+        - label: Backend
+        - label: API
+        - label: Base de données
+        - label: CI/CD
+        - label: Infrastructure
+
+
+  - type: textarea
+    id: repro-steps
+    attributes:
+      label: Étapes pour reproduire
+      description: Listez les étapes exactes pour reproduire le problème.
+      placeholder: |
+        1. Aller sur ...
+        2. Exécuter ...
+        3. Observer ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportement attendu
+      placeholder: Que devrait-il se passer ?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Comportement observé
+      placeholder: Que se passe-t-il en réalité ?
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical-context
+    attributes:
+      label: Contexte technique
+      description: Environnement, version, navigateur/OS, flags, configuration spécifique.
+      placeholder: |
+        - Environnement : local / staging / production
+        - Version : commit / tag / release
+        - Navigateur / OS :
+        - Feature flags / variables d'environnement :
+    validations:
+      required: true
+
+  - type: input
+    id: last-working-version
+    attributes:
+      label: Dernière version fonctionnelle connue (optionnel)
+      placeholder: ex. v1.2.3 ou commit SHA
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / stack traces / captures
+      description: Collez ici les éléments utiles.
+      render: shell
+
+  - type: textarea
+    id: attempted-investigation
+    attributes:
+      label: Investigation déjà effectuée
+      description: Listez les vérifications déjà faites pour éviter les doublons.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Confirmation
+      options:
+        - label: J'ai vérifié les issues existantes et je n'ai pas trouvé de doublon.
+          required: true

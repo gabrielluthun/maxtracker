@@ -1,0 +1,99 @@
+name: Question / support
+description: Ask a question about usage or behavior
+title: "[QUESTION] "
+labels:
+  - question
+  - triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Utilisez ce formulaire pour les questions d'usage/support. Pour un bug confirmé, utilisez le template bug report.
+
+  - type: dropdown
+    id: request-type
+    attributes:
+      label: Type de demande
+      options:
+        - Compréhension fonctionnelle
+        - Aide à l'utilisation
+        - Aide au debugging
+        - Architecture / design
+        - Déploiement / infrastructure
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Votre question
+      placeholder: Posez votre question clairement.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexte
+      description: Quel est l'objectif que vous essayez d'atteindre ?
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: Ce que vous avez déjà essayé
+      placeholder: Listez les pistes déjà tentées.
+
+  - type: textarea
+    id: current-result
+    attributes:
+      label: Résultat actuel
+      placeholder: Que se passe-t-il actuellement ?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-result
+    attributes:
+      label: Résultat attendu
+      placeholder: Qu'attendiez-vous ?
+
+  - type: textarea
+    id: minimal-example
+    attributes:
+      label: Exemple minimal utile
+      description: Commande, requête, payload ou extrait de code.
+      render: shell
+
+  - type: input
+    id: app-version
+    attributes:
+      label: Version app / commit
+      placeholder: ex. v1.2.3 ou commit SHA
+
+  - type: input
+    id: os-runtime
+    attributes:
+      label: OS et runtime
+      placeholder: ex. macOS 14, Node 22, Python 3.12
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environnement
+      options:
+        - Local
+        - Staging
+        - Production
+        - Autre
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Confirmation
+      options:
+        - label: J'ai vérifié les issues et la documentation avant de soumettre.
+          required: true
