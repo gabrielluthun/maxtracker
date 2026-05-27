@@ -71,7 +71,7 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
                 onChange={(e) => { setQuery(e.target.value); setOpen(true); setActive(-1); }}
                 onFocus={() => setOpen(true)}
                 onKeyDown={onKeyDown}
-                placeholder="Tapez 3 lettres (Paris, Lyon, Bordeaux...)"
+                placeholder="Tapez au moins 3 lettres pour trouver une gare"
                 className="w-full h-14 pl-12 pr-12 rounded-xl bg-slate-50 border-2 border-slate-200 focus:border-[#0A2540] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#0A2540]/10 text-lg"
               />
               {origin && (
@@ -122,7 +122,7 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
               className="h-14 w-full sm:w-auto px-8 rounded-xl bg-[#0A2540] hover:bg-[#173A5E] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold tracking-wide transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap"
             >
               <Search className="h-5 w-5 shrink-0" strokeWidth={2.5} />
-              {loading ? "Recherche…" : "Trouver les 0€"}
+              {loading ? "Recherche en cours…" : "Voir les trajets à 0€"}
             </button>
           </div>
         </div>
