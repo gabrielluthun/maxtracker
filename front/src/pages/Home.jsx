@@ -33,6 +33,11 @@ const defaultFilters = {
   directOnly: false,
 };
 
+// Mobile: limiter le nombre de destinations rendues pour réduire le scroll et améliorer la perf perçue.
+// Desktop (lg+) conserve la liste complète.
+const MOBILE_INITIAL_DESTINATIONS = 10;
+const MOBILE_DESTINATIONS_STEP = 5;
+
 export default function Home({ syncInfo, registerRerunSearch }) {
   const [origin, setOrigin] = useState(null);
   const [data, setData] = useState(null);
@@ -41,6 +46,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
   const [animateResults, setAnimateResults] = useState(false);
   const [hidden, setHidden] = useState(getHidden());
   const [tab, setTab] = useState("list");
+  const [mobileVisibleDestinations, setMobileVisibleDestinations] = useState(MOBILE_INITIAL_DESTINATIONS);
 
   const onFiltersChange = (next) => {
     setAnimateResults(false);
@@ -119,6 +125,11 @@ export default function Home({ syncInfo, registerRerunSearch }) {
     if (tab === "list") return [];
     return filteredGroups.flatMap((g) => g.trips);
   }, [filteredGroups, tab]);
+
+  useEffect(() => {
+    // Si la requête change (nouvelle gare) ou si le set de résultats change, on repart du seuil initial.
+    setMobileVisibleDestinations(MOBILE_INITIAL_DESTINATIONS);
+  }, [data?.origin, filteredGroups.length]);
 
   const onHide = useCallback((key) => {
     hideDestination(key);
@@ -223,11 +234,29 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                       Aucun résultat avec ces filtres.
                     </div>
                   ) : (
-                    <div className={cn("space-y-4", animateResults && "stagger")}>
-                      {filteredGroups.map((g) => (
-                        <DestinationGroup key={g.destination_city} group={g} onHide={onHide} />
-                      ))}
-                    </div>
+                    <>
+                      <div className={cn("hidden lg:block space-y-4", animateResults && "stagger")}>
+                        {filteredGroups.map((g) => (
+                          <DestinationGroup key={g.destination_city} group={g} onHide={onHide} />
+                        ))}
+                      </div>
+
+                      <div className={cn("lg:hidden space-y-4", animateResults && "stagger")}>
+                        {filteredGroups.slice(0, mobileVisibleDestinations).map((g) => (
+                          <DestinationGroup key={g.destination_city} group={g} onHide={onHide} />
+                        ))}
+                        {filteredGroups.length > mobileVisibleDestinations && (
+                          <button
+                            type="button"
+                            onClick={() => setMobileVisibleDestinations((prev) => prev + MOBILE_DESTINATIONS_STEP)}
+                            className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#0A2540] hover:bg-slate-50 text-sm font-semibold text-slate-700 transition-colors"
+                            data-testid="mobile-load-more-destinations"
+                          >
+                            Afficher {MOBILE_DESTINATIONS_STEP} destinations de plus ({filteredGroups.length - mobileVisibleDestinations} restantes)
+                          </button>
+                        )}
+                      </div>
+                    </>
                   )}
                 </TabsContent>
 
