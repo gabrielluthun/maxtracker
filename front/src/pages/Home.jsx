@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { List, CalendarDays, BarChart3, Sparkles, AlertCircle, Inbox } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import FiltersPanel from "@/components/FiltersPanel";
+import MobileFiltersSheet from "@/components/MobileFiltersSheet";
 import {
   enrichSearchGroups,
   tripMatchesFilters,
@@ -187,7 +188,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
 
         {!loading && data && data.served && data.total_trips > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 mt-2">
-            <div className="lg:col-span-3 order-2 lg:order-1">
+            <div className="hidden lg:block lg:col-span-3 order-2 lg:order-1">
               <FiltersPanel
                 filters={filters}
                 onChange={onFiltersChange}
@@ -240,6 +241,16 @@ export default function Home({ syncInfo, registerRerunSearch }) {
               </Tabs>
             </div>
           </div>
+        )}
+
+        {!loading && data && data.served && data.total_trips > 0 && (
+          <MobileFiltersSheet
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            hiddenCount={hidden.length}
+            onResetHidden={onResetHidden}
+            totalDestinations={filteredGroups.length}
+          />
         )}
 
         <Disclaimer />

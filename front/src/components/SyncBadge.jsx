@@ -1,5 +1,5 @@
 import { Info, RefreshCw, Wifi, WifiOff } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function timeAgo(iso) {
   if (!iso) return "—";
@@ -74,12 +74,28 @@ function SncfDataInfo() {
 
 export default function SyncBadge({ info, onRefresh, refreshing }) {
   const [, force] = useState(0);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const mobilePanelRef = useRef(null);
   useEffect(() => { const id = setInterval(() => force((x) => x + 1), 30000); return () => clearInterval(id); }, []);
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onPointerDown = (event) => {
+      if (mobilePanelRef.current && !mobilePanelRef.current.contains(event.target)) {
+        setMobileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+    };
+  }, [mobileOpen]);
   const ok = info?.last_sync_status === "ok";
 
   return (
-    <div className="flex items-center gap-3" data-testid="sync-badge">
-      <div className="text-[11px] leading-tight text-right" data-testid="sncf-update-status">
+    <div className="relative flex items-center gap-1.5 sm:gap-3 min-w-0" data-testid="sync-badge" ref={mobilePanelRef}>
+      <div className="hidden md:block text-[11px] leading-tight text-right" data-testid="sncf-update-status">
         <div className="flex items-center justify-end gap-1">
           <span className="font-semibold text-slate-600">Données SNCF</span>
           <SncfDataInfo />
@@ -87,13 +103,36 @@ export default function SyncBadge({ info, onRefresh, refreshing }) {
         <div className="text-slate-500 font-mono">{timeAgo(info?.sncf_data_updated_at)}</div>
       </div>
 
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200">
+      <button
+        type="button"
+        onClick={() => setMobileOpen((v) => !v)}
+        className="flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 hover:bg-slate-50 transition-colors"
+        aria-label="Afficher les détails de synchronisation"
+        aria-expanded={mobileOpen}
+        data-testid="sync-status-toggle"
+      >
         {ok ? <Wifi className="h-3.5 w-3.5 text-emerald-600" /> : <WifiOff className="h-3.5 w-3.5 text-amber-600" />}
-        <div className="text-[11px] leading-tight">
+        <div className="hidden sm:block text-[11px] leading-tight">
           <div className="font-semibold text-slate-700">Dernière sync</div>
           <div className="text-slate-500 font-mono">{timeAgo(info?.last_sync_at)}</div>
         </div>
-      </div>
+      </button>
+
+      {mobileOpen && (
+        <div
+          className="md:hidden absolute right-0 top-full mt-2 w-56 rounded-xl border border-slate-200 bg-white p-3 shadow-lg text-[11px] leading-tight z-50"
+          data-testid="sync-status-panel-mobile"
+        >
+          <div className="mb-2">
+            <div className="font-semibold text-slate-700">Données SNCF</div>
+            <div className="text-slate-500 font-mono">{timeAgo(info?.sncf_data_updated_at)}</div>
+          </div>
+          <div>
+            <div className="font-semibold text-slate-700">Dernière sync</div>
+            <div className="text-slate-500 font-mono">{timeAgo(info?.last_sync_at)}</div>
+          </div>
+        </div>
+      )}
 
       <button
         onClick={onRefresh}

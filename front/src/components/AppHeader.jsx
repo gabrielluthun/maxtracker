@@ -62,15 +62,17 @@ export default function AppHeader({ activeView, trailing = null }) {
                   onClick={() => navigateToView(view)}
                   data-testid={testId}
                   aria-current={active ? "page" : undefined}
+                  aria-label={label}
+                  title={label}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-all",
+                    "inline-flex items-center justify-center sm:justify-start gap-1.5 rounded-md p-2 sm:px-3 sm:py-1 text-sm font-medium transition-all",
                     active
                       ? "bg-white dark:bg-slate-700 text-[#0A2540] dark:text-slate-100 shadow-sm"
                       : "text-slate-600 dark:text-slate-400 hover:text-[#0A2540] dark:hover:text-slate-100"
                   )}
                 >
                   <Icon className="h-4 w-4" />
-                  {label}
+                  <span className="hidden sm:inline">{label}</span>
                 </button>
               );
             })}
