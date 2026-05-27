@@ -60,7 +60,7 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
         <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
           Gare de départ
         </label>
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+        <div className="flex flex-col md:flex-row gap-3 md:items-center">
           <div className="flex-1 min-w-0 relative">
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" strokeWidth={2.25} />
@@ -114,15 +114,22 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
             )}
           </div>
 
-          <div className="shrink-0">
+          <div className="shrink-0 md:shrink">
             <button
               data-testid="search-submit-btn"
               onClick={() => origin && onSearch(origin)}
               disabled={!origin || loading}
-              className="h-14 w-full sm:w-auto px-8 rounded-xl bg-[#0A2540] hover:bg-[#173A5E] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold tracking-wide transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap"
+              className="h-14 w-full md:w-auto px-8 rounded-xl bg-[#0A2540] hover:bg-[#173A5E] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold tracking-wide transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap"
             >
               <Search className="h-5 w-5 shrink-0" strokeWidth={2.5} />
-              {loading ? "Recherche en cours…" : "Voir les trajets à 0€"}
+              {loading ? (
+                "Recherche en cours…"
+              ) : (
+                <>
+                  <span className="md:hidden">Rechercher</span>
+                  <span className="hidden md:inline">Voir les trajets à 0€</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -131,11 +138,11 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
           <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2 flex-wrap" data-testid="favorites-bar">
             <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Favoris</span>
             {favs.map((f) => (
-              <div key={f.raw} className="group flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-900 rounded-full pl-3 pr-1 py-1 text-sm">
+              <div key={f.raw} className="group flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-900 rounded-full pl-3 pr-1 py-1 text-sm max-w-full">
                 <button
                   data-testid={`fav-pick-${f.raw}`}
                   onClick={() => { onOriginChange(f); setQuery(f.name); onSearch(f); }}
-                  className="font-medium"
+                  className="font-medium truncate max-w-[70vw] sm:max-w-none"
                 >
                   {f.name}
                 </button>
