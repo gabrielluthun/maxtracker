@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Documentation du projet
-    url: https://github.com/gabrielluthun/tgvmax-platform/blob/main/README.md
+    url: https://github.com/gabrielluthun/tgvmax-platform/blob/develop/README.md
     about: Consultez la documentation avant de créer une issue.
