@@ -1,5 +1,5 @@
 import { Info, RefreshCw, Wifi, WifiOff } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function timeAgo(iso) {
   if (!iso) return "—";
@@ -75,11 +75,26 @@ function SncfDataInfo() {
 export default function SyncBadge({ info, onRefresh, refreshing }) {
   const [, force] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mobilePanelRef = useRef(null);
   useEffect(() => { const id = setInterval(() => force((x) => x + 1), 30000); return () => clearInterval(id); }, []);
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onPointerDown = (event) => {
+      if (mobilePanelRef.current && !mobilePanelRef.current.contains(event.target)) {
+        setMobileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+    };
+  }, [mobileOpen]);
   const ok = info?.last_sync_status === "ok";
 
   return (
-    <div className="relative flex items-center gap-1.5 sm:gap-3 min-w-0" data-testid="sync-badge">
+    <div className="relative flex items-center gap-1.5 sm:gap-3 min-w-0" data-testid="sync-badge" ref={mobilePanelRef}>
       <div className="hidden md:block text-[11px] leading-tight text-right" data-testid="sncf-update-status">
         <div className="flex items-center justify-end gap-1">
           <span className="font-semibold text-slate-600">Données SNCF</span>
