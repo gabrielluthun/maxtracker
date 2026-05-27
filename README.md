@@ -30,6 +30,7 @@ Les recherches portent aujourd'hui sur les trajets **sans correspondance** uniqu
 MaxTracker importe ce flux environ **toutes les 15 minutes** lorsque le service tourne : ce n'est pas du temps réel, et permet de rafraîchir la base (trajets éligibles et heures de départ).
 
 Pour le détail des filtres, des horodatages affichés et des écarts possibles avec SNCF Connect, voir la page **À propos** dans l'application (`#/about`) ou le fichier [front/src/pages/About.jsx](front/src/pages/About.jsx).
+
 ---
 
 ## Fonctionnalités
