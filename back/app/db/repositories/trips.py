@@ -1,7 +1,8 @@
 """MongoDB access for the trips collection."""
 import re
-from typing import Any
+from typing import Any, Iterable
 
+from app.domain.stations import HUB_METROPOLISES
 from app.domain.trips import paris_cleanup_cutoff
 
 
@@ -44,6 +45,27 @@ class TripsRepository:
     ) -> list[dict]:
         cursor = self._col.find(query, self._PROJECTION).sort([("departure_datetime", 1)])
         return await cursor.to_list(limit)
+
+    async def find_departures_from_hubs(
+        self,
+        hubs: Iterable[str],
+        dates: Iterable[str],
+        *,
+        limit: int = 5000,
+    ) -> list[dict]:
+        """
+        Segments partant d'une métropole-hub (Paris, Lyon, …) pour les dates données.
+        Alimente la composition nationale des correspondances.
+        """
+        hub_list = [h for h in hubs if h in HUB_METROPOLISES]
+        date_list = sorted({d for d in dates if d})
+        if not hub_list or not date_list:
+            return []
+        query = {
+            "origine_metropolis": {"$in": hub_list},
+            "date": {"$in": date_list},
+        }
+        return await self.find_by_query(query, limit=limit)
 
     async def exists_with_origine_norm(self, origin_norm: str) -> bool:
         doc = await self._col.find_one({"origine_norm": origin_norm})
