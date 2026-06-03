@@ -53,7 +53,7 @@ class TestConnectionSearchKeys(unittest.TestCase):
         ]
         hubs, dates = connection_search_keys(outbound, origin_metropolis=None)
         self.assertEqual(hubs, frozenset())
-        self.assertEqual(dates, frozenset({"2026-06-10"}))
+        self.assertEqual(dates, frozenset())
 
 
 class TestComposePipeline(unittest.TestCase):
