@@ -103,9 +103,11 @@ export function tripMatchesFilters(t, filters) {
   return legMatchesTrainFilters(t, filters);
 }
 
-/** Parcours avec correspondance ; masqué si « Sans correspondance » (directOnly) est actif. */
+/** Parcours avec correspondance ; filtré selon maxConnections (0–2). */
 export function connectedTripMatchesFilters(ct, filters) {
-  if (filters.directOnly) return false;
+  const maxConn = filters.maxConnections ?? 2;
+  const count = (ct.legs?.length ?? 1) - 1;
+  if (count > maxConn) return false;
   if (!matchesCommonFilters(ct, filters)) return false;
   const legs = ct.legs || [];
   if (legs.length === 0) return false;
