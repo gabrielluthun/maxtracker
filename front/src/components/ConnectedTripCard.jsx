@@ -9,6 +9,8 @@ const TRAIN_TYPE_STYLES = {
   INTERCITES_NUIT: { badge: "bg-[#4F46E5] text-white", label: "INTERCITÉS DE NUIT" },
 };
 
+const LEG_LABELS = ["1er train", "2e train", "3e train"];
+
 function fmtHHmm(s) {
   return (s || "").slice(0, 5);
 }
@@ -79,6 +81,8 @@ function ConnectedTripCard({ connected }) {
   const waitM = connected.connection_minutes % 60;
   const waitLabel =
     waitH > 0 ? `${waitH}h${waitM.toString().padStart(2, "0")}` : `${waitM} min`;
+  const hubLabel = connected.hub_metropolis || "";
+  const connCount = connected.connection_count ?? (connected.legs?.length || 1) - 1;
 
   return (
     <div
@@ -92,7 +96,7 @@ function ConnectedTripCard({ connected }) {
             data-testid="connection-hub-badge"
           >
             <GitBranch className="h-3 w-3" strokeWidth={2.5} />
-            Correspondance · {connected.hub_metropolis}
+            {connCount === 1 ? "Correspondance" : "Correspondances"} · {hubLabel}
           </span>
           {imminent && (
             <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded bg-[#F59E0B] text-white flex items-center gap-1">
@@ -111,7 +115,7 @@ function ConnectedTripCard({ connected }) {
             <div className="font-mono text-2xl font-semibold text-slate-900 tabular-nums">{fmtHHmm(connected.heure_arrivee)}</div>
           </div>
           <div className="text-xs text-slate-500 ml-auto font-mono">
-            {waitLabel} à {connected.hub_metropolis}
+            {waitLabel} d&apos;attente totale
             {connected.total_duration_minutes > 0 && (
               <span className="text-slate-400">
                 {" "}
@@ -123,8 +127,9 @@ function ConnectedTripCard({ connected }) {
         </div>
       </div>
       <div className="p-5 space-y-3">
-        {connected.legs?.[0] && <LegRow leg={connected.legs[0]} label="1er train" />}
-        {connected.legs?.[1] && <LegRow leg={connected.legs[1]} label="2e train" />}
+        {(connected.legs || []).map((leg, i) => (
+          <LegRow key={leg.id || i} leg={leg} label={LEG_LABELS[i] || `${i + 1}e train`} />
+        ))}
       </div>
     </div>
   );
