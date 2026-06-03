@@ -23,11 +23,28 @@ class TripOut(BaseModel):
     departure_datetime: str
 
 
+class ConnectedTripOut(BaseModel):
+    """Parcours à 2 segments avec correspondance dans une métropole-hub."""
+
+    id: str
+    date: str
+    heure_depart: str
+    heure_arrivee: str
+    departure_datetime: str
+    hub_metropolis: str
+    connection_minutes: int
+    total_duration_minutes: int
+    destination_metropolis: Optional[str] = None
+    legs: List[TripOut]
+    price_checked_at: Optional[str] = None
+
+
 class DestinationGroup(BaseModel):
     destination_city: str
     destinations: List[str]
     trip_count: int
     trips: List[TripOut]
+    connected_trips: List[ConnectedTripOut] = []
 
 
 class SearchResponse(BaseModel):
