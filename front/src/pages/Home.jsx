@@ -31,7 +31,7 @@ const defaultFilters = {
   showInoui: true,
   showIntercites: true,
   showIntercitesNuit: true,
-  directOnly: false,
+  maxConnections: 0,
 };
 
 // Mobile: limiter le nombre de destinations rendues pour réduire le scroll et améliorer la perf perçue.
