@@ -100,16 +100,32 @@ function FiltersPanel({ filters, onChange, hiddenCount, onResetHidden, totalDest
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="font-medium text-slate-800">Sans correspondance</div>
-            <div className="text-xs text-slate-500 mt-0.5">Masque les parcours avec changement de train</div>
+        <div>
+          <div className="font-medium text-slate-800 mb-2">Correspondances max</div>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { value: 0, label: "Direct", testId: "filter-connections-0" },
+              { value: 1, label: "1", testId: "filter-connections-1" },
+              { value: 2, label: "2", testId: "filter-connections-2" },
+            ].map(({ value, label, testId }) => (
+              <button
+                key={value}
+                type="button"
+                data-testid={testId}
+                onClick={() => set("maxConnections", value)}
+                className={`px-2 py-2 rounded-lg border text-xs font-semibold transition-colors ${
+                  filters.maxConnections === value
+                    ? "bg-[#0A2540] text-white border-[#0A2540]"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-          <Switch
-            data-testid="filter-direct"
-            checked={filters.directOnly}
-            onCheckedChange={(v) => set("directOnly", v)}
-          />
+          <div className="text-xs text-slate-500 mt-1.5">
+            Direct = sans changement · 2 max = jusqu&apos;à 3 trains
+          </div>
         </div>
 
         {/* Hidden destinations */}
