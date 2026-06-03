@@ -24,6 +24,9 @@ METROPOLIS_MAP: dict[str, str] = {
     "NANCY": "Nancy",
 }
 
+# Métropoles pouvant servir de point de correspondance (même liste que METROPOLIS_MAP).
+HUB_METROPOLISES: frozenset[str] = frozenset(METROPOLIS_MAP.values())
+
 
 def normalize_station(name: str) -> str:
     """Normalize station name (uppercase, no accents, trimmed)."""
@@ -40,6 +43,11 @@ def metropolis_for(station_normalized: str) -> Optional[str]:
         return None
     first = station_normalized.split(" ")[0]
     return METROPOLIS_MAP.get(first)
+
+
+def is_hub_metropolis(label: Optional[str]) -> bool:
+    """True si la ville peut servir de correspondance (Paris, Lyon, Lille, …)."""
+    return bool(label and label in HUB_METROPOLISES)
 
 
 def trip_id(train_no: str, date: str, origine: str, destination: str) -> str:

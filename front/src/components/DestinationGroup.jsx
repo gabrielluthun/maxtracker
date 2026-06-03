@@ -1,16 +1,46 @@
 import { memo, useState } from "react";
 import { ChevronDown, ChevronUp, MapPin, EyeOff } from "lucide-react";
 import TrainCard from "@/components/TrainCard";
-import { formatTripDayLabel, getParisClock, groupHasDepartureToday, groupTripsByDate } from "@/lib/tripTime";
+import ConnectedTripCard from "@/components/ConnectedTripCard";
+import {
+  formatTripDayLabel,
+  getParisClock,
+  groupDestinationItemsByDate,
+  groupHasDepartureToday,
+} from "@/lib/tripTime";
+
+function flattenVisibleItems(trips, connectedTrips, visibleCount) {
+  const all = [
+    ...trips.map((trip) => ({ kind: "direct", trip, sortKey: trip.departure_datetime })),
+    ...connectedTrips.map((connected) => ({
+      kind: "connected",
+      connected,
+      sortKey: connected.departure_datetime,
+    })),
+  ].sort((a, b) => String(a.sortKey).localeCompare(String(b.sortKey)));
+  const slice = all.slice(0, visibleCount);
+  const visTrips = [];
+  const visConnected = [];
+  for (const item of slice) {
+    if (item.kind === "direct") visTrips.push(item.trip);
+    else visConnected.push(item.connected);
+  }
+  return { visTrips, visConnected, total: all.length };
+}
 
 function DestinationGroup({ group, onHide, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   const [visibleCount, setVisibleCount] = useState(10);
-  const visible = group.trips.slice(0, visibleCount);
-  const daySections = groupTripsByDate(visible);
+  const connected = group.connected_trips || [];
+  const { visTrips, visConnected, total } = flattenVisibleItems(
+    group.trips,
+    connected,
+    visibleCount
+  );
+  const daySections = groupDestinationItemsByDate(visTrips, visConnected);
   const today = getParisClock().today;
-  const hasTodayDeparture = groupHasDepartureToday(group.trips);
-  const hasMore = group.trips.length > visibleCount;
+  const hasTodayDeparture = groupHasDepartureToday(group.trips, connected);
+  const hasMore = total > visibleCount;
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden" data-testid={`destination-group-${group.destination_city}`}>
@@ -82,13 +112,17 @@ function DestinationGroup({ group, onHide, defaultOpen = false }) {
                     </span>
                   )}
                   <span className="ml-auto text-xs text-slate-500 tabular-nums">
-                    {day.trips.length} trajet{day.trips.length > 1 ? "s" : ""}
+                    {day.items.length} trajet{day.items.length > 1 ? "s" : ""}
                   </span>
                 </div>
                 <div className="space-y-3 pt-3">
-                  {day.trips.map((t) => (
-                    <TrainCard key={t.id} trip={t} />
-                  ))}
+                  {day.items.map((item) =>
+                    item.kind === "direct" ? (
+                      <TrainCard key={item.trip.id} trip={item.trip} />
+                    ) : (
+                      <ConnectedTripCard key={item.connected.id} connected={item.connected} />
+                    )
+                  )}
                 </div>
               </section>
             ))}
@@ -99,7 +133,7 @@ function DestinationGroup({ group, onHide, defaultOpen = false }) {
               className="mt-4 w-full py-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#0A2540] hover:bg-slate-50 text-sm font-semibold text-slate-700 transition-colors"
               data-testid={`load-more-${group.destination_city}`}
             >
-              Afficher 10 trajets de plus ({group.trips.length - visibleCount} restants)
+              Afficher 10 trajets de plus ({total - visibleCount} restants)
             </button>
           )}
         </div>

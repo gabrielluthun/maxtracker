@@ -22,6 +22,7 @@ class Database:
         await self.trips.create_index("destination_norm")
         await self.trips.create_index("origine_metropolis")
         await self.trips.create_index("destination_metropolis")
+        await self.trips.create_index([("origine_metropolis", 1), ("date", 1)])
         await self.trips.create_index("date")
         await self.trips.create_index("departure_datetime")
 
