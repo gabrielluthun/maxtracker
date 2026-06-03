@@ -132,6 +132,33 @@
     background-size: 16px 1px;
     background-repeat: repeat-x;
   }
+  .filter-chip-inactive {
+    @apply bg-white text-slate-600 border-slate-200 hover:border-slate-300;
+    @apply dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600 dark:hover:border-slate-500;
+  }
+  /* Accent filtres actifs en mode nuit (mint fort, type badge « Départ aujourd'hui ») */
+  .dark .filter-accent-highlight {
+    background-color: #142e2e;
+    color: #79f2c0;
+    border-color: #265454;
+  }
+  .filter-chip-active {
+    @apply bg-[#0A2540] text-white border-[#0A2540];
+  }
+  .dark .filter-chip-active {
+    background-color: #142e2e;
+    color: #79f2c0;
+    border-color: #265454;
+    box-shadow: 0 0 0 1px rgb(38 84 84 / 0.45);
+  }
+  .filter-train-inactive {
+    @apply bg-white text-slate-600 border-slate-200;
+    @apply dark:bg-slate-800 dark:text-slate-400 dark:border-slate-600;
+  }
+  .trip-leg-surface {
+    @apply rounded-lg border border-slate-100 bg-slate-50/80 p-4;
+    @apply dark:bg-slate-800 dark:border-slate-600;
+  }
   .card-hover {
     transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
   }

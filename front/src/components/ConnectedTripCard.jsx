@@ -36,21 +36,27 @@ function LegRow({ leg, label }) {
   const fare = leg.fare_eur ?? 0;
 
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50/80 p-4">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">{label}</div>
+    <div className="trip-leg-surface">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+        {label}
+      </div>
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
         <div className="min-w-0 flex-1 grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-2 sm:gap-4 sm:items-center">
           <div>
-            <div className="font-mono text-lg font-semibold text-slate-900 tabular-nums">{fmtHHmm(leg.heure_depart)}</div>
-            <div className="text-xs text-slate-600 line-clamp-1">{leg.origine}</div>
+            <div className="font-mono text-lg font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
+              {fmtHHmm(leg.heure_depart)}
+            </div>
+            <div className="text-xs text-slate-600 dark:text-slate-400 line-clamp-1">{leg.origine}</div>
           </div>
-          <div className="hidden sm:flex items-center justify-center text-slate-400">
+          <div className="hidden sm:flex items-center justify-center text-slate-400 dark:text-slate-500">
             <Train className="h-4 w-4" strokeWidth={1.75} />
             <span className="mx-2 text-[10px] font-mono">N°{leg.train_no}</span>
           </div>
           <div className="sm:text-right">
-            <div className="font-mono text-lg font-semibold text-slate-900 tabular-nums">{fmtHHmm(leg.heure_arrivee)}</div>
-            <div className="text-xs text-slate-600 line-clamp-1">{leg.destination}</div>
+            <div className="font-mono text-lg font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
+              {fmtHHmm(leg.heure_arrivee)}
+            </div>
+            <div className="text-xs text-slate-600 dark:text-slate-400 line-clamp-1">{leg.destination}</div>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -70,7 +76,9 @@ function LegRow({ leg, label }) {
           </a>
         </div>
       </div>
-      <div className="sm:hidden text-[10px] text-slate-400 font-mono mt-1">Train N°{leg.train_no} · {dayLabel}</div>
+      <div className="sm:hidden text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-1">
+        Train N°{leg.train_no} · {dayLabel}
+      </div>
     </div>
   );
 }
@@ -87,12 +95,12 @@ function ConnectedTripCard({ connected }) {
   return (
     <div
       data-testid={`connected-trip-${connected.id}`}
-      className="card-hover bg-white border border-slate-200 rounded-xl overflow-hidden border-l-4 border-l-[#6366F1]"
+      className="card-hover bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden border-l-4 border-l-[#6366F1] dark:border-l-indigo-400"
     >
-      <div className="p-5 border-b border-slate-100">
+      <div className="p-5 border-b border-slate-100 dark:border-slate-700">
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <span
-            className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-[#6366F1]/10 text-[#4F46E5] border border-[#6366F1]/25"
+            className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-[#6366F1]/10 text-[#4F46E5] border border-[#6366F1]/25 dark:bg-indigo-500/20 dark:text-indigo-200 dark:border-indigo-400/40"
             data-testid="connection-hub-badge"
           >
             <GitBranch className="h-3 w-3" strokeWidth={2.5} />
@@ -106,18 +114,26 @@ function ConnectedTripCard({ connected }) {
         </div>
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <div>
-            <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Départ</span>
-            <div className="font-mono text-2xl font-semibold text-slate-900 tabular-nums">{fmtHHmm(connected.heure_depart)}</div>
+            <span className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+              Départ
+            </span>
+            <div className="font-mono text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
+              {fmtHHmm(connected.heure_depart)}
+            </div>
           </div>
-          <ArrowRight className="h-5 w-5 text-slate-300 hidden sm:block" aria-hidden />
+          <ArrowRight className="h-5 w-5 text-slate-300 dark:text-slate-600 hidden sm:block" aria-hidden />
           <div>
-            <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Arrivée</span>
-            <div className="font-mono text-2xl font-semibold text-slate-900 tabular-nums">{fmtHHmm(connected.heure_arrivee)}</div>
+            <span className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+              Arrivée
+            </span>
+            <div className="font-mono text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
+              {fmtHHmm(connected.heure_arrivee)}
+            </div>
           </div>
-          <div className="text-xs text-slate-500 ml-auto font-mono">
+          <div className="text-xs text-slate-500 dark:text-slate-400 ml-auto font-mono">
             {waitLabel} d&apos;attente totale
             {connected.total_duration_minutes > 0 && (
-              <span className="text-slate-400">
+              <span className="text-slate-400 dark:text-slate-500">
                 {" "}
                 · {Math.floor(connected.total_duration_minutes / 60)}h
                 {(connected.total_duration_minutes % 60).toString().padStart(2, "0")} total

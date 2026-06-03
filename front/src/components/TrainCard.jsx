@@ -48,30 +48,30 @@ function TrainCard({ trip }) {
   return (
     <div
       data-testid={`train-card-${trip.id}`}
-      className="card-hover bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col sm:flex-row"
+      className="card-hover bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden flex flex-col sm:flex-row"
     >
       <div className={cn("sm:w-2 h-2 sm:h-auto", style.ribbon)} />
 
       <div className="flex-1 p-5 grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr_auto] gap-4 sm:items-center">
         <div>
-          <div className="font-mono text-2xl font-semibold text-slate-900 tabular-nums">{fmtHHmm(trip.heure_depart)}</div>
-          <div className="text-sm text-slate-600 mt-0.5 line-clamp-1">{trip.origine}</div>
+          <div className="font-mono text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{fmtHHmm(trip.heure_depart)}</div>
+          <div className="text-sm text-slate-600 dark:text-slate-400 mt-0.5 line-clamp-1">{trip.origine}</div>
         </div>
 
         <div className="hidden sm:flex flex-col items-center justify-center px-2">
-          <div className="text-[10px] text-slate-400 mb-1 font-mono">{durationStr(trip.heure_depart, trip.heure_arrivee)}</div>
+          <div className="text-[10px] text-slate-400 dark:text-slate-500 mb-1 font-mono">{durationStr(trip.heure_depart, trip.heure_arrivee)}</div>
           <div className="flex items-center gap-1.5">
-            <div className="h-px w-10 bg-slate-300" />
-            <Train className="h-4 w-4 text-slate-400" strokeWidth={1.75} />
-            <div className="h-px w-10 bg-slate-300" />
+            <div className="h-px w-10 bg-slate-300 dark:bg-slate-600" />
+            <Train className="h-4 w-4 text-slate-400 dark:text-slate-500" strokeWidth={1.75} />
+            <div className="h-px w-10 bg-slate-300 dark:bg-slate-600" />
           </div>
-          <div className="text-[10px] text-slate-400 mt-1 font-mono">N°{trip.train_no}</div>
+          <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-mono">N°{trip.train_no}</div>
         </div>
 
         <div className="sm:text-right">
-          <div className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Arrivée</div>
-          <div className="font-mono text-2xl font-semibold text-slate-900 tabular-nums">{fmtHHmm(trip.heure_arrivee)}</div>
-          <div className="text-sm text-slate-600 mt-0.5 line-clamp-1">{trip.destination}</div>
+          <div className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold mb-0.5">Arrivée</div>
+          <div className="font-mono text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{fmtHHmm(trip.heure_arrivee)}</div>
+          <div className="text-sm text-slate-600 dark:text-slate-400 mt-0.5 line-clamp-1">{trip.destination}</div>
         </div>
 
         <div className="flex sm:flex-col items-start sm:items-end gap-2">

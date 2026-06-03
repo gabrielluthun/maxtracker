@@ -75,12 +75,12 @@ export default function MobileFiltersSheet({
           />
           <div
             className={cn(
-              "absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-3xl bg-white p-4 pb-6 shadow-2xl transition-transform duration-200 ease-out",
+              "absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-3xl bg-white dark:bg-slate-900 p-4 pb-6 shadow-2xl transition-transform duration-200 ease-out",
               open ? "translate-y-0" : "translate-y-full"
             )}
           >
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900">Filtres</h3>
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Filtres</h3>
               <button
                 type="button"
                 onClick={closeSheet}

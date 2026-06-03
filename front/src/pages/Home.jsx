@@ -1,14 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useDeferredValue, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { List, CalendarDays, BarChart3, Sparkles, AlertCircle, Inbox } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import FiltersPanel from "@/components/FiltersPanel";
 import MobileFiltersSheet from "@/components/MobileFiltersSheet";
 import {
+  DEFAULT_DATE_HORIZON_DAYS,
   enrichSearchGroups,
-  connectedTripMatchesFilters,
-  destinationGroupResultsEqual,
-  tripMatchesFilters,
+  filterPreparedGroups,
 } from "@/lib/tripTime";
 import DestinationGroup from "@/components/DestinationGroup";
 import CalendarView from "@/components/CalendarView";
@@ -32,6 +31,8 @@ const defaultFilters = {
   showIntercites: true,
   showIntercitesNuit: true,
   maxConnections: 0,
+  maxDurationMinutes: null,
+  dateHorizonDays: DEFAULT_DATE_HORIZON_DAYS,
 };
 
 // Mobile: limiter le nombre de destinations rendues pour réduire le scroll et améliorer la perf perçue.
@@ -44,15 +45,16 @@ export default function Home({ syncInfo, registerRerunSearch }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState(defaultFilters);
+  const deferredFilters = useDeferredValue(filters);
   const [animateResults, setAnimateResults] = useState(false);
   const [hidden, setHidden] = useState(getHidden());
   const [tab, setTab] = useState("list");
   const [mobileVisibleDestinations, setMobileVisibleDestinations] = useState(MOBILE_INITIAL_DESTINATIONS);
 
-  const onFiltersChange = (next) => {
+  const onFiltersChange = useCallback((next) => {
     setAnimateResults(false);
     setFilters(next);
-  };
+  }, []);
 
   const handleSearch = useCallback(async (station, freshPrices = false) => {
     if (!station || !station.raw) {
@@ -92,39 +94,15 @@ export default function Home({ syncInfo, registerRerunSearch }) {
   const filteredCacheRef = useRef(new Map());
 
   const { groups: filteredGroups, totalTrips } = useMemo(() => {
-    if (!preparedGroups.length) return { groups: [], totalTrips: 0 };
-    const hiddenSet = new Set(hidden);
-    const cache = filteredCacheRef.current;
-    const nextCache = new Map();
-    const out = [];
-    let total = 0;
-
-    for (const g of preparedGroups) {
-      if (hiddenSet.has(g.destination_city)) continue;
-      const trips = [];
-      const connected_trips = [];
-      for (const t of g.trips) {
-        if (tripMatchesFilters(t, filters)) trips.push(t);
-      }
-      for (const ct of g.connected_trips || []) {
-        if (connectedTripMatchesFilters(ct, filters)) connected_trips.push(ct);
-      }
-      if (trips.length === 0 && connected_trips.length === 0) continue;
-      total += trips.length + connected_trips.length;
-      const key = g.destination_city;
-      const prev = cache.get(key);
-      const entry = { ...g, trips, connected_trips, trip_count: trips.length + connected_trips.length };
-      if (prev && destinationGroupResultsEqual(prev, entry)) {
-        nextCache.set(key, prev);
-        out.push(prev);
-      } else {
-        nextCache.set(key, entry);
-        out.push(entry);
-      }
-    }
-    filteredCacheRef.current = nextCache;
-    return { groups: out, totalTrips: total };
-  }, [preparedGroups, filters, hidden]);
+    const { groups, totalTrips: total, cache } = filterPreparedGroups(
+      preparedGroups,
+      deferredFilters,
+      hidden,
+      filteredCacheRef.current
+    );
+    filteredCacheRef.current = cache;
+    return { groups, totalTrips: total };
+  }, [preparedGroups, deferredFilters, hidden]);
 
   const allFilteredTrips = useMemo(() => {
     if (tab === "list") return [];
