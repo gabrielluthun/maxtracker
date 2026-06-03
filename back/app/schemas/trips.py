@@ -24,7 +24,7 @@ class TripOut(BaseModel):
 
 
 class ConnectedTripOut(BaseModel):
-    """Parcours à 2 segments avec correspondance dans une métropole-hub."""
+    """Parcours multi-segments (1 ou 2 correspondances, 3 trains max)."""
 
     id: str
     date: str
@@ -32,6 +32,7 @@ class ConnectedTripOut(BaseModel):
     heure_arrivee: str
     departure_datetime: str
     hub_metropolis: str
+    connection_count: int = 1
     connection_minutes: int
     total_duration_minutes: int
     destination_metropolis: Optional[str] = None
