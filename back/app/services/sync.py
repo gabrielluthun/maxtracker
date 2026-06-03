@@ -20,11 +20,13 @@ class SyncService:
         trips_repo: TripsRepository,
         sync_repo: SyncStateRepository,
         sncf: SncfClient,
+        search_service=None,
     ) -> None:
         self._settings = settings
         self._trips = trips_repo
         self._sync = sync_repo
         self._sncf = sncf
+        self._search = search_service
 
     async def sync_trips(self) -> dict:
         started = datetime.now(timezone.utc)
@@ -112,6 +114,13 @@ class SyncService:
             total,
             (finished - started).total_seconds(),
         )
+
+        if self._search is not None:
+            try:
+                await self._search.warm_cache()
+            except Exception:
+                logger.exception("Cache warming failed after sync")
+
         return {"status": "ok", "total": total}
 
     async def cleanup_past_trips(self) -> int:
