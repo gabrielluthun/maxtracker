@@ -1,7 +1,10 @@
 """Trip search and station autocomplete."""
+import asyncio
+import logging
 from datetime import datetime, timezone
 
 from app.config import Settings
+from app.db.repositories.search_cache import SearchCacheRepository
 from app.db.repositories.sync_state import SyncStateRepository
 from app.db.repositories.trips import TripsRepository
 from app.domain.connections import (
@@ -32,6 +35,11 @@ from app.services.connection_search import merge_connected_into_groups
 from app.services.sncf.client import SncfClient
 from app.services.sncf.connect import build_sncf_connect_url
 
+logger = logging.getLogger("maxtracker")
+
+# Concurrence du pré-calcul de cache (nb d'origines calculées en parallèle).
+CACHE_WARM_CONCURRENCY = 8
+
 
 class SearchService:
     def __init__(
@@ -40,11 +48,13 @@ class SearchService:
         trips_repo: TripsRepository,
         sync_repo: SyncStateRepository,
         sncf: SncfClient,
+        cache_repo: SearchCacheRepository,
     ) -> None:
         self._settings = settings
         self._trips = trips_repo
         self._sync = sync_repo
         self._sncf = sncf
+        self._cache = cache_repo
 
     async def search_stations(self, q: str, *, limit: int = 15) -> list[StationSuggestion]:
         q = (q or "").strip()
@@ -127,7 +137,69 @@ class SearchService:
         groups_out.sort(key=lambda x: (-x.trip_count, x.destination_city))
         return groups_out
 
+    def _cache_key(self, origin: str) -> str:
+        """Clé canonique d'une origine (identique entre warming et requête)."""
+        origin_clean = origin.strip()
+        origin_norm = normalize_station(origin_clean)
+        if is_metropolis_query(origin_clean, origin_norm):
+            return "metro:" + metropolis_label(origin_clean, origin_norm)
+        return "norm:" + origin_norm
+
     async def search_trips(
+        self,
+        origin: str,
+        *,
+        fresh_prices: bool = False,
+    ) -> SearchResponse:
+        # fresh_prices = re-contrôle live SNCF : jamais servi depuis le cache.
+        if fresh_prices:
+            return await self._compute_search_response(origin, fresh_prices=True)
+
+        last_sync = await self._sync.get_last_sync_at()
+        key = self._cache_key(origin)
+        cached = await self._cache.get(key)
+        if cached and last_sync is not None and cached.get("sync_at") == last_sync:
+            payload = {**cached["payload"], "origin": origin.strip()}
+            return SearchResponse(**payload)
+
+        resp = await self._compute_search_response(origin, fresh_prices=False)
+        await self._cache.set(
+            key, resp.model_dump(mode="json"), sync_at=resp.last_sync_at
+        )
+        return resp
+
+    async def warm_cache(self) -> int:
+        """Pré-calcule la réponse /search de chaque origine après une sync."""
+        last_sync = await self._sync.get_last_sync_at()
+        norms = await self._trips.distinct_origines_norm()
+        metros = await self._trips.distinct_origine_metropolis()
+        origins = list(norms) + list(metros)
+        if not origins:
+            return 0
+
+        sem = asyncio.Semaphore(CACHE_WARM_CONCURRENCY)
+        count = 0
+
+        async def warm_one(origin: str) -> None:
+            nonlocal count
+            async with sem:
+                try:
+                    resp = await self._compute_search_response(origin, fresh_prices=False)
+                    await self._cache.set(
+                        self._cache_key(origin),
+                        resp.model_dump(mode="json"),
+                        sync_at=last_sync,
+                    )
+                    count += 1
+                except Exception:
+                    logger.exception("Cache warm failed for origin %r", origin)
+
+        await asyncio.gather(*(warm_one(o) for o in origins))
+        removed = await self._cache.prune(keep_sync_at=last_sync)
+        logger.info("Cache warmed: %d origins, %d stale entries pruned", count, removed)
+        return count
+
+    async def _compute_search_response(
         self,
         origin: str,
         *,
