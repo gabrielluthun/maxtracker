@@ -4,7 +4,15 @@ from datetime import datetime, timezone
 from app.config import Settings
 from app.db.repositories.sync_state import SyncStateRepository
 from app.db.repositories.trips import TripsRepository
-from app.domain.connections import compose_connected_journeys, connection_search_keys
+from app.domain.connections import (
+    compose_connected_journeys,
+    direct_trip_fingerprint,
+    find_all_connected_journeys,
+    hub_date_keys_from_outbound,
+    hub_date_keys_from_two_leg_journeys,
+    merge_hub_departure_docs,
+    segment_from_trip_doc,
+)
 from app.domain.stations import (
     is_metropolis_query,
     metropolis_for,
@@ -141,17 +149,38 @@ class SearchService:
 
         price_checked_at = datetime.now(timezone.utc).isoformat()
 
-        hubs, dates = connection_search_keys(raw, origin_metropolis=origin_metropolis)
+        hub_keys = hub_date_keys_from_outbound(
+            raw, origin_metropolis=origin_metropolis
+        )
         hub_raw: list[dict] = []
-        if hubs and dates:
-            hub_raw = await self._trips.find_departures_from_hubs(
-                hubs,
-                dates,
+        if hub_keys:
+            hub_raw = await self._trips.find_departures_from_hub_date_keys(
+                hub_keys,
                 limit=self._settings.search_result_limit,
             )
             hub_raw = [
                 t for t in hub_raw if not departure_passed(t["date"], t["heure_depart"])
             ]
+            if raw and hub_raw:
+                preview = find_all_connected_journeys(
+                    [segment_from_trip_doc(t) for t in raw],
+                    [segment_from_trip_doc(t) for t in hub_raw],
+                    origin_metropolis=origin_metropolis,
+                    max_connections=1,
+                )
+                extra_keys = hub_date_keys_from_two_leg_journeys(preview)
+                missing = extra_keys - hub_keys
+                if missing:
+                    hub_raw_2 = await self._trips.find_departures_from_hub_date_keys(
+                        missing,
+                        limit=self._settings.search_result_limit,
+                    )
+                    hub_raw_2 = [
+                        t
+                        for t in hub_raw_2
+                        if not departure_passed(t["date"], t["heure_depart"])
+                    ]
+                    hub_raw = merge_hub_departure_docs(hub_raw, hub_raw_2)
 
         pool_for_live = raw + hub_raw
         if pool_for_live and fresh_prices:
@@ -186,8 +215,18 @@ class SearchService:
             key = dest_metro if dest_metro else dest
             g = grouped.setdefault(
                 key,
-                {"destinations": set(), "trips": [], "connected_trips": []},
+                {
+                    "destinations": set(),
+                    "trips": [],
+                    "connected_trips": [],
+                    "seen_direct": set(),
+                    "seen_connected": set(),
+                },
             )
+            fp = direct_trip_fingerprint(t)
+            if fp in g["seen_direct"]:
+                continue
+            g["seen_direct"].add(fp)
             g["destinations"].add(dest)
             g["trips"].append(t)
 
