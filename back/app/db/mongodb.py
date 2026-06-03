@@ -17,6 +17,10 @@ class Database:
     def sync_state(self) -> AsyncIOMotorCollection:
         return self._db.sync_state
 
+    @property
+    def search_cache(self) -> AsyncIOMotorCollection:
+        return self._db.search_cache
+
     async def ensure_indexes(self) -> None:
         await self.trips.create_index("origine_norm")
         await self.trips.create_index("destination_norm")
@@ -25,6 +29,7 @@ class Database:
         await self.trips.create_index([("origine_metropolis", 1), ("date", 1)])
         await self.trips.create_index("date")
         await self.trips.create_index("departure_datetime")
+        await self.search_cache.create_index("sync_at")
 
     async def close(self) -> None:
         self._client.close()
