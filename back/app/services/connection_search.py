@@ -62,7 +62,6 @@ def connected_trip_out_from_journey(
         for seg in journey.legs
     ]
     first = journey.legs[0]
-    last = journey.legs[1]
     dep_dt = first.departure_datetime or f"{first.date}T{first.heure_depart[:5]}:00"
     return ConnectedTripOut(
         id=journey.journey_id,
@@ -71,6 +70,7 @@ def connected_trip_out_from_journey(
         heure_arrivee=journey.heure_arrivee,
         departure_datetime=dep_dt,
         hub_metropolis=journey.hub_metropolis,
+        connection_count=journey.connection_count,
         connection_minutes=journey.connection_minutes,
         total_duration_minutes=journey.total_duration_minutes,
         destination_metropolis=journey.destination_metropolis,
@@ -83,7 +83,7 @@ def destination_key_for_journey(journey: ConnectedJourney) -> str:
     """Clé de regroupement (métropole ou gare finale)."""
     if journey.destination_metropolis:
         return journey.destination_metropolis
-    return journey.legs[1].destination
+    return journey.legs[-1].destination
 
 
 def merge_connected_into_groups(
@@ -98,9 +98,18 @@ def merge_connected_into_groups(
         key = destination_key_for_journey(journey)
         g = grouped.setdefault(
             key,
-            {"destinations": set(), "trips": [], "connected_trips": []},
+            {
+                "destinations": set(),
+                "trips": [],
+                "connected_trips": [],
+                "seen_connected": set(),
+            },
         )
-        final_dest = journey.legs[1].destination
+        fp = journey.fingerprint
+        if fp in g["seen_connected"]:
+            continue
+        g["seen_connected"].add(fp)
+        final_dest = journey.legs[-1].destination
         if final_dest:
             g["destinations"].add(final_dest)
         g["connected_trips"].append(
