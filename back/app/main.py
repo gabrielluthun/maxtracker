@@ -11,6 +11,7 @@ from app.config import get_settings
 from app.core.logging import setup_logging
 from app.core.rate_limit import RateLimiter
 from app.db.mongodb import Database
+from app.db.repositories.search_cache import SearchCacheRepository
 from app.db.repositories.sync_state import SyncStateRepository
 from app.db.repositories.trips import TripsRepository
 from app.services.search import SearchService
@@ -28,14 +29,20 @@ async def lifespan(app: FastAPI):
 
     trips_repo = TripsRepository(db.trips)
     sync_repo = SyncStateRepository(db.sync_state)
+    search_cache_repo = SearchCacheRepository(db.search_cache)
     sncf_client = SncfClient(settings)
-    sync_service = SyncService(settings, trips_repo, sync_repo, sncf_client)
-    search_service = SearchService(settings, trips_repo, sync_repo, sncf_client)
+    search_service = SearchService(
+        settings, trips_repo, sync_repo, sncf_client, search_cache_repo
+    )
+    sync_service = SyncService(
+        settings, trips_repo, sync_repo, sncf_client, search_service
+    )
     rate_limiter = RateLimiter(settings.rate_limit_per_min)
 
     app.state.db = db
     app.state.trips_repo = trips_repo
     app.state.sync_repo = sync_repo
+    app.state.search_cache_repo = search_cache_repo
     app.state.sncf_client = sncf_client
     app.state.sync_service = sync_service
     app.state.search_service = search_service

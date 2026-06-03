@@ -106,6 +106,14 @@ class TripsRepository:
         doc = await self._col.find_one({"origine_norm": origin_norm})
         return doc is not None
 
+    async def distinct_origines_norm(self) -> list[str]:
+        vals = await self._col.distinct("origine_norm")
+        return [v for v in vals if v]
+
+    async def distinct_origine_metropolis(self) -> list[str]:
+        vals = await self._col.distinct("origine_metropolis")
+        return [v for v in vals if v]
+
     async def search_origines(self, q_norm: str, *, limit: int) -> list[str]:
         pipeline = [
             {"$match": {"origine_norm": {"$regex": re.escape(q_norm)}}},
