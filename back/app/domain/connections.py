@@ -38,6 +38,10 @@ class TripSegment:
     destination_metropolis: Optional[str] = None
     train_type: str = ""
     segment_id: str = ""
+    origine_iata: Optional[str] = None
+    destination_iata: Optional[str] = None
+    axe: str = ""
+    departure_datetime: str = ""
 
 
 @dataclass(frozen=True)
@@ -264,7 +268,25 @@ def segment_from_trip_doc(doc: dict) -> TripSegment:
             doc.get("origine", ""),
             doc.get("destination", ""),
         ),
+        origine_iata=doc.get("origine_iata"),
+        destination_iata=doc.get("destination_iata"),
+        axe=doc.get("axe") or "",
+        departure_datetime=doc.get("departure_datetime", ""),
     )
+
+
+def connection_search_keys(
+    outbound_docs: Sequence[dict],
+    *,
+    origin_metropolis: Optional[str],
+) -> tuple[frozenset[str], frozenset[str]]:
+    """
+    Hubs et dates à charger en base pour la 2e requête (échelle nationale, ciblée).
+    """
+    segments = [segment_from_trip_doc(d) for d in outbound_docs]
+    hubs = hubs_reachable_as_first_leg(segments, origin_metropolis=origin_metropolis)
+    dates = frozenset(d.get("date", "") for d in outbound_docs if d.get("date"))
+    return hubs, dates
 
 
 def segments_to_connected_journeys(
@@ -283,5 +305,19 @@ def segments_to_connected_journeys(
         segments_departing_hubs,
         origin_metropolis=origin_metropolis,
         destination_metropolis=destination_metropolis,
+    )
+
+
+def compose_connected_journeys(
+    outbound_docs: Sequence[dict],
+    hub_departure_docs: Sequence[dict],
+    *,
+    origin_metropolis: Optional[str] = None,
+) -> list[ConnectedJourney]:
+    """Pipeline recherche : documents Mongo → parcours composés."""
+    return segments_to_connected_journeys(
+        [segment_from_trip_doc(d) for d in outbound_docs],
+        [segment_from_trip_doc(d) for d in hub_departure_docs],
+        origin_metropolis=origin_metropolis,
     )
     
