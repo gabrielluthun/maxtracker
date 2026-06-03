@@ -100,11 +100,10 @@ function FiltersPanel({ filters, onChange, hiddenCount, onResetHidden, totalDest
           </div>
         </div>
 
-        {/* Hide connections (TGVmax data is direct anyway, mostly informational) */}
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="font-medium text-slate-800">Sans correspondance</div>
-            <div className="text-xs text-slate-500 mt-0.5">Trajets directs uniquement</div>
+            <div className="text-xs text-slate-500 mt-0.5">Masque les parcours avec changement de train</div>
           </div>
           <Switch
             data-testid="filter-direct"
