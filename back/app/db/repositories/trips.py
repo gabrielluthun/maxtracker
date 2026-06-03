@@ -2,7 +2,7 @@
 import re
 from typing import Any, Iterable
 
-from app.domain.stations import HUB_METROPOLISES
+from app.domain.stations import HUB_METROPOLISES, trip_id
 from app.domain.trips import paris_cleanup_cutoff
 
 
@@ -55,7 +55,7 @@ class TripsRepository:
     ) -> list[dict]:
         """
         Segments partant d'une métropole-hub (Paris, Lyon, …) pour les dates données.
-        Alimente la composition nationale des correspondances.
+        Préférer find_departures_from_hub_date_keys pour limiter le volume.
         """
         hub_list = [h for h in hubs if h in HUB_METROPOLISES]
         date_list = sorted({d for d in dates if d})
@@ -66,6 +66,41 @@ class TripsRepository:
             "date": {"$in": date_list},
         }
         return await self.find_by_query(query, limit=limit)
+
+    async def find_departures_from_hub_date_keys(
+        self,
+        keys: Iterable[tuple[str, str]],
+        *,
+        limit: int = 8000,
+        chunk_size: int = 80,
+    ) -> list[dict]:
+        """
+        Segments pour des paires (date, hub) précises — évite la troncature à 5000.
+        """
+        clauses: list[dict[str, Any]] = []
+        for date, hub in keys:
+            if date and hub in HUB_METROPOLISES:
+                clauses.append({"date": date, "origine_metropolis": hub})
+        if not clauses:
+            return []
+        seen_ids: set[str] = set()
+        out: list[dict] = []
+        for i in range(0, len(clauses), chunk_size):
+            batch = clauses[i : i + chunk_size]
+            query: dict[str, Any] = batch[0] if len(batch) == 1 else {"$or": batch}
+            rows = await self.find_by_query(query, limit=limit)
+            for row in rows:
+                sid = trip_id(
+                    row.get("train_no", ""),
+                    row.get("date", ""),
+                    row.get("origine", ""),
+                    row.get("destination", ""),
+                )
+                if sid in seen_ids:
+                    continue
+                seen_ids.add(sid)
+                out.append(row)
+        return out
 
     async def exists_with_origine_norm(self, origin_norm: str) -> bool:
         doc = await self._col.find_one({"origine_norm": origin_norm})
