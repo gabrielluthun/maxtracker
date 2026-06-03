@@ -54,6 +54,12 @@
 
 @layer base {
   * { @apply border-border; }
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
   body {
     @apply bg-background text-foreground;
     font-family: 'DM Sans', system-ui, sans-serif;
@@ -180,4 +186,23 @@
   .stagger > *:nth-child(6) { animation-delay: .22s; }
   .stagger > *:nth-child(7) { animation-delay: .26s; }
   .stagger > *:nth-child(8) { animation-delay: .30s; }
+}
+
+/* Fondu progressif clair ↔ sombre au clic sur le toggle */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition-property: background-color, border-color, color, fill, stroke, outline-color, box-shadow;
+  transition-duration: 0.45s;
+  transition-timing-function: ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-transition,
+  html.theme-transition *,
+  html.theme-transition *::before,
+  html.theme-transition *::after {
+    transition-duration: 0.01ms;
+  }
 }

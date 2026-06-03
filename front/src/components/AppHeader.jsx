@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { Train, Search, Info, Sun, Moon } from "lucide-react";
 import { APP_VIEW, navigateToView } from "@/lib/appView";
 import { cn } from "@/lib/utils";
@@ -8,15 +8,27 @@ const NAV_ITEMS = [
   { view: APP_VIEW.ABOUT, label: "À propos", icon: Info, testId: "nav-about" },
 ];
 
-function applyTheme(dark) {
-  document.documentElement.classList.toggle("dark", dark);
+function initialDark() {
+  try {
+    const stored = localStorage.getItem("mt_theme");
+    if (stored === "dark") return true;
+    if (stored === "light") return false;
+  } catch {
+    /* ignore */
+  }
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
 export default function AppHeader({ activeView, trailing = null }) {
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(initialDark);
 
-  useEffect(() => {
-    applyTheme(dark);
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    try {
+      localStorage.setItem("mt_theme", dark ? "dark" : "light");
+    } catch {
+      /* ignore */
+    }
   }, [dark]);
 
   return (
@@ -83,7 +95,12 @@ export default function AppHeader({ activeView, trailing = null }) {
           {trailing}
           <button
             type="button"
-            onClick={() => setDark((d) => !d)}
+            onClick={() => {
+              const root = document.documentElement;
+              root.classList.add("theme-transition");
+              setDark((d) => !d);
+              window.setTimeout(() => root.classList.remove("theme-transition"), 450);
+            }}
             className={cn(
               "p-2 rounded-full transition-colors shrink-0",
               dark
