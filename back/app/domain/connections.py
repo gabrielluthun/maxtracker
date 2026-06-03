@@ -1,10 +1,8 @@
 """
-Composition de parcours avec correspondance (2 segments).
+Composition de parcours avec correspondance (2 à 3 segments, max 2 correspondances).
 
-Chaque ligne open data = un segment. Toute correspondance valide joint :
-  segment 1 : métropole A → métropole hub H
-  segment 2 : métropole H → métropole B
-avec H dans HUB_METROPOLISES (Paris, Lyon, Lille, …) et une fenêtre horaire réaliste.
+Chaque ligne open data = un segment. Les hubs sont les métropoles du référentiel
+(Paris, Lyon, Lille, …) avec fenêtres de correspondance 25 / 50 min.
 """
 from __future__ import annotations
 
@@ -22,6 +20,7 @@ from app.domain.stations import (
 MIN_CONNECT_SAME_STATION = 25
 MIN_CONNECT_SAME_METROPOLIS = 50
 MAX_CONNECT_MINUTES = 6 * 60
+MAX_CONNECTIONS = 2  # 3 segments max
 
 HubDateKey = tuple[str, str]  # (date ISO, hub metropolis label)
 
@@ -46,10 +45,13 @@ class TripSegment:
 
 @dataclass(frozen=True)
 class ConnectedJourney:
-    hub_metropolis: str
-    legs: tuple[TripSegment, TripSegment]
+    legs: tuple[TripSegment, ...]
     connection_minutes: int
     total_duration_minutes: int
+
+    @property
+    def connection_count(self) -> int:
+        return len(self.legs) - 1
 
     @property
     def date(self) -> str:
@@ -61,15 +63,79 @@ class ConnectedJourney:
 
     @property
     def heure_arrivee(self) -> str:
-        return self.legs[1].heure_arrivee
+        return self.legs[-1].heure_arrivee
 
     @property
     def destination_metropolis(self) -> Optional[str]:
-        return self.legs[1].destination_metropolis
+        return self.legs[-1].destination_metropolis
+
+    @property
+    def hub_metropolises(self) -> tuple[str, ...]:
+        hubs: list[str] = []
+        for i in range(len(self.legs) - 1):
+            hub = connectable_hub(self.legs[i], self.legs[i + 1])
+            if hub:
+                hubs.append(hub)
+        return tuple(hubs)
+
+    @property
+    def hub_metropolis(self) -> str:
+        return " · ".join(self.hub_metropolises)
 
     @property
     def journey_id(self) -> str:
-        return f"{self.legs[0].segment_id}>>{self.legs[1].segment_id}"
+        return self.fingerprint
+
+    @property
+    def fingerprint(self) -> str:
+        """Empreinte affichable (trains + horaires + gares), indépendante des segment_id open data."""
+        return journey_fingerprint(self)
+
+
+def _leg_origin_key(leg: TripSegment) -> str:
+    """Même métropole de départ → une seule clé (ex. LILLE EUROPE vs LILLE intramuros)."""
+    if leg.origine_metropolis:
+        return f"metro:{leg.origine_metropolis}"
+    return normalize_station(leg.origine)
+
+
+def leg_fingerprint(leg: TripSegment) -> str:
+    dep = (leg.heure_depart or "")[:5]
+    arr = (leg.heure_arrivee or "")[:5]
+    return (
+        f"{leg.date}|{dep}|{arr}|{leg.train_no}|"
+        f"{_leg_origin_key(leg)}|{normalize_station(leg.destination)}"
+    )
+
+
+def journey_fingerprint(journey: ConnectedJourney) -> str:
+    return ">>".join(leg_fingerprint(leg) for leg in journey.legs)
+
+
+def direct_trip_fingerprint(doc: dict) -> str:
+    """Empreinte d'un trajet direct (déduplication open data)."""
+    dep = (doc.get("heure_depart") or "")[:5]
+    arr = (doc.get("heure_arrivee") or "")[:5]
+    orig_metro = doc.get("origine_metropolis")
+    orig = f"metro:{orig_metro}" if orig_metro else normalize_station(doc.get("origine", ""))
+    return (
+        f"{doc.get('date', '')}|{dep}|{arr}|{doc.get('train_no', '')}|"
+        f"{orig}|{normalize_station(doc.get('destination', ''))}"
+    )
+
+
+def dedupe_connected_journeys(
+    journeys: Sequence[ConnectedJourney],
+) -> list[ConnectedJourney]:
+    seen: set[str] = set()
+    out: list[ConnectedJourney] = []
+    for j in journeys:
+        fp = j.fingerprint
+        if fp in seen:
+            continue
+        seen.add(fp)
+        out.append(j)
+    return out
 
 
 def time_to_minutes(hhmm: str) -> int:
@@ -105,9 +171,6 @@ def required_connection_minutes(
 
 
 def connectable_hub(leg1: TripSegment, leg2: TripSegment) -> Optional[str]:
-    """
-    Hub de correspondance si les deux segments s'enchaînent dans la même métropole H.
-    """
     if leg1.date != leg2.date:
         return None
     hub = leg1.destination_metropolis
@@ -119,7 +182,6 @@ def connectable_hub(leg1: TripSegment, leg2: TripSegment) -> Optional[str]:
 
 
 def is_viable_first_leg(leg: TripSegment, *, origin_metropolis: Optional[str]) -> bool:
-    """Segment « vers un hub » : arrive dans une métropole différente du départ."""
     hub = leg.destination_metropolis
     if not is_hub_metropolis(hub):
         return False
@@ -128,18 +190,16 @@ def is_viable_first_leg(leg: TripSegment, *, origin_metropolis: Optional[str]) -
     return True
 
 
-def is_viable_second_leg(leg: TripSegment) -> bool:
-    """Segment « depuis un hub »."""
+def is_viable_hub_departure_leg(leg: TripSegment) -> bool:
     return is_hub_metropolis(leg.origine_metropolis)
 
 
-def is_meaningful_journey(leg1: TripSegment, leg2: TripSegment) -> bool:
-    """Exclut les allers-retours immédiats (ex. Lille → Paris → Lille)."""
-    dest = leg2.destination_metropolis
-    orig = leg1.origine_metropolis
+def is_meaningful_journey(leg_first: TripSegment, leg_last: TripSegment) -> bool:
+    dest = leg_last.destination_metropolis
+    orig = leg_first.origine_metropolis
     if dest and orig and dest == orig:
         return False
-    if leg1.segment_id and leg1.segment_id == leg2.segment_id:
+    if leg_first.segment_id and leg_first.segment_id == leg_last.segment_id:
         return False
     return True
 
@@ -178,7 +238,6 @@ def segments_connect(
 def build_departures_from_hub_index(
     segments: Iterable[TripSegment],
 ) -> dict[HubDateKey, list[TripSegment]]:
-    """Index (date, hub) → segments qui partent de ce hub."""
     index: DefaultDict[HubDateKey, list[TripSegment]] = defaultdict(list)
     for leg in segments:
         hub = leg.origine_metropolis
@@ -188,22 +247,26 @@ def build_departures_from_hub_index(
     return dict(index)
 
 
-def find_all_connected_journeys(
-    first_legs: Sequence[TripSegment],
-    second_legs: Sequence[TripSegment],
-    *,
-    origin_metropolis: Optional[str] = None,
-    destination_metropolis: Optional[str] = None,
-    max_connect_minutes: int = MAX_CONNECT_MINUTES,
-) -> list[ConnectedJourney]:
-    """
-    Toutes les correspondances à 2 segments entre first_legs et second_legs.
+def _journey_from_legs(legs: tuple[TripSegment, ...]) -> ConnectedJourney:
+    wait = sum(
+        minutes_between_arrival_and_departure(legs[i].heure_arrivee, legs[i + 1].heure_depart)
+        for i in range(len(legs) - 1)
+    )
+    total = minutes_between_arrival_and_departure(legs[0].heure_depart, legs[-1].heure_arrivee)
+    return ConnectedJourney(
+        legs=legs,
+        connection_minutes=wait,
+        total_duration_minutes=total,
+    )
 
-    - first_legs : en pratique les segments partant de la gare / métropole recherchée
-    - second_legs : pool plus large (ex. tous les départs depuis les hubs ce jour-là)
-    - destination_metropolis : si renseigné, ne garde que les parcours vers cette ville
-    """
-    index = build_departures_from_hub_index(second_legs)
+
+def _find_two_leg_journeys(
+    first_legs: Sequence[TripSegment],
+    index: dict[HubDateKey, list[TripSegment]],
+    *,
+    origin_metropolis: Optional[str],
+    max_connect_minutes: int,
+) -> list[ConnectedJourney]:
     out: list[ConnectedJourney] = []
     seen: set[str] = set()
 
@@ -212,29 +275,101 @@ def find_all_connected_journeys(
             continue
         hub = leg1.destination_metropolis
         assert hub is not None
-        candidates = index.get((leg1.date, hub), ())
-        for leg2 in candidates:
-            if not is_viable_second_leg(leg2):
-                continue
-            if destination_metropolis and leg2.destination_metropolis != destination_metropolis:
+        for leg2 in index.get((leg1.date, hub), ()):
+            if not is_viable_hub_departure_leg(leg2):
                 continue
             if not segments_connect(leg1, leg2, max_connect_minutes=max_connect_minutes):
                 continue
-            wait = minutes_between_arrival_and_departure(leg1.heure_arrivee, leg2.heure_depart)
-            total = minutes_between_arrival_and_departure(leg1.heure_depart, leg2.heure_arrivee)
-            journey = ConnectedJourney(
-                hub_metropolis=hub,
-                legs=(leg1, leg2),
-                connection_minutes=wait,
-                total_duration_minutes=total,
-            )
-            if journey.journey_id in seen:
+            if not is_meaningful_journey(leg1, leg2):
                 continue
-            seen.add(journey.journey_id)
+            journey = _journey_from_legs((leg1, leg2))
+            fp = journey.fingerprint
+            if fp in seen:
+                continue
+            seen.add(fp)
             out.append(journey)
-
-    out.sort(key=lambda j: (j.date, j.heure_depart, j.connection_minutes))
     return out
+
+
+def _extend_to_three_legs(
+    two_leg: Sequence[ConnectedJourney],
+    index: dict[HubDateKey, list[TripSegment]],
+    *,
+    max_connect_minutes: int,
+    seen: set[str],
+) -> list[ConnectedJourney]:
+    out: list[ConnectedJourney] = []
+    for journey in two_leg:
+        leg2 = journey.legs[-1]
+        hub = leg2.destination_metropolis
+        if not hub:
+            continue
+        for leg3 in index.get((leg2.date, hub), ()):
+            if not is_viable_hub_departure_leg(leg3):
+                continue
+            if not segments_connect(leg2, leg3, max_connect_minutes=max_connect_minutes):
+                continue
+            if not is_meaningful_journey(journey.legs[0], leg3):
+                continue
+            if leg3.segment_id in {leg.segment_id for leg in journey.legs}:
+                continue
+            legs3 = (*journey.legs, leg3)
+            j3 = _journey_from_legs(legs3)
+            fp = j3.fingerprint
+            if fp in seen:
+                continue
+            seen.add(fp)
+            out.append(j3)
+    return out
+
+
+def find_all_connected_journeys(
+    first_legs: Sequence[TripSegment],
+    hub_departure_legs: Sequence[TripSegment],
+    *,
+    origin_metropolis: Optional[str] = None,
+    destination_metropolis: Optional[str] = None,
+    max_connections: int = MAX_CONNECTIONS,
+    max_connect_minutes: int = MAX_CONNECT_MINUTES,
+) -> list[ConnectedJourney]:
+    max_connections = min(max(max_connections, 0), MAX_CONNECTIONS)
+    if max_connections == 0:
+        return []
+
+    index = build_departures_from_hub_index(hub_departure_legs)
+    seen: set[str] = set()
+    out: list[ConnectedJourney] = []
+
+    two_leg = _find_two_leg_journeys(
+        first_legs,
+        index,
+        origin_metropolis=origin_metropolis,
+        max_connect_minutes=max_connect_minutes,
+    )
+    for j in two_leg:
+        fp = j.fingerprint
+        if fp in seen:
+            continue
+        seen.add(fp)
+        if j.connection_count <= max_connections:
+            out.append(j)
+
+    if max_connections >= 2:
+        three_leg = _extend_to_three_legs(
+            two_leg,
+            index,
+            max_connect_minutes=max_connect_minutes,
+            seen=seen,
+        )
+        for j in three_leg:
+            if j.connection_count <= max_connections:
+                out.append(j)
+
+    if destination_metropolis:
+        out = [j for j in out if j.destination_metropolis == destination_metropolis]
+
+    out.sort(key=lambda j: (j.date, j.heure_depart, j.connection_count, j.connection_minutes))
+    return dedupe_connected_journeys(out)
 
 
 def hubs_reachable_as_first_leg(
@@ -242,13 +377,54 @@ def hubs_reachable_as_first_leg(
     *,
     origin_metropolis: Optional[str],
 ) -> frozenset[str]:
-    """Métropoles-hub atteignables en un segment depuis l'origine."""
     return frozenset(
         leg.destination_metropolis
         for leg in segments
         if is_viable_first_leg(leg, origin_metropolis=origin_metropolis)
         and leg.destination_metropolis
     )
+
+
+def hub_date_keys_from_outbound(
+    outbound_docs: Sequence[dict],
+    *,
+    origin_metropolis: Optional[str],
+) -> frozenset[HubDateKey]:
+    """Paires (date, hub) pour la 1re requête Mongo."""
+    segments = [segment_from_trip_doc(d) for d in outbound_docs]
+    keys: set[HubDateKey] = set()
+    for leg in segments:
+        if not is_viable_first_leg(leg, origin_metropolis=origin_metropolis):
+            continue
+        if leg.date and leg.destination_metropolis:
+            keys.add((leg.date, leg.destination_metropolis))
+    return frozenset(keys)
+
+
+def hub_date_keys_from_two_leg_journeys(
+    journeys: Sequence[ConnectedJourney],
+) -> frozenset[HubDateKey]:
+    """Paires (date, hub) pour charger les départs du 2e hub (3e segment)."""
+    keys: set[HubDateKey] = set()
+    for j in journeys:
+        if j.connection_count < 1:
+            continue
+        last = j.legs[-1]
+        if last.date and last.destination_metropolis and is_hub_metropolis(last.destination_metropolis):
+            keys.add((last.date, last.destination_metropolis))
+    return frozenset(keys)
+
+
+def connection_search_keys(
+    outbound_docs: Sequence[dict],
+    *,
+    origin_metropolis: Optional[str],
+) -> tuple[frozenset[str], frozenset[str]]:
+    """Compat tests : hubs + dates dérivés des clés (date, hub)."""
+    keys = hub_date_keys_from_outbound(outbound_docs, origin_metropolis=origin_metropolis)
+    hubs = frozenset(h for _, h in keys)
+    dates = frozenset(d for d, _ in keys)
+    return hubs, dates
 
 
 def segment_from_trip_doc(doc: dict) -> TripSegment:
@@ -275,36 +451,20 @@ def segment_from_trip_doc(doc: dict) -> TripSegment:
     )
 
 
-def connection_search_keys(
-    outbound_docs: Sequence[dict],
-    *,
-    origin_metropolis: Optional[str],
-) -> tuple[frozenset[str], frozenset[str]]:
-    """
-    Hubs et dates à charger en base pour la 2e requête (échelle nationale, ciblée).
-    """
-    segments = [segment_from_trip_doc(d) for d in outbound_docs]
-    hubs = hubs_reachable_as_first_leg(segments, origin_metropolis=origin_metropolis)
-    dates = frozenset(d.get("date", "") for d in outbound_docs if d.get("date"))
-    return hubs, dates
-
-
 def segments_to_connected_journeys(
     outbound_from_origin: Sequence[TripSegment],
     segments_departing_hubs: Sequence[TripSegment],
     *,
     origin_metropolis: Optional[str] = None,
     destination_metropolis: Optional[str] = None,
+    max_connections: int = MAX_CONNECTIONS,
 ) -> list[ConnectedJourney]:
-    """
-    Point d'entrée pour la recherche : compose toutes les correspondances possibles
-    vers destination_metropolis (ex. Marseille), pour tous les hubs.
-    """
     return find_all_connected_journeys(
         outbound_from_origin,
         segments_departing_hubs,
         origin_metropolis=origin_metropolis,
         destination_metropolis=destination_metropolis,
+        max_connections=max_connections,
     )
 
 
@@ -313,11 +473,30 @@ def compose_connected_journeys(
     hub_departure_docs: Sequence[dict],
     *,
     origin_metropolis: Optional[str] = None,
+    max_connections: int = MAX_CONNECTIONS,
 ) -> list[ConnectedJourney]:
-    """Pipeline recherche : documents Mongo → parcours composés."""
     return segments_to_connected_journeys(
         [segment_from_trip_doc(d) for d in outbound_docs],
         [segment_from_trip_doc(d) for d in hub_departure_docs],
         origin_metropolis=origin_metropolis,
+        max_connections=max_connections,
     )
-    
+
+
+def merge_hub_departure_docs(*doc_lists: Sequence[dict]) -> list[dict]:
+    """Fusionne des listes de segments hub sans doublon _id."""
+    seen: set[str] = set()
+    out: list[dict] = []
+    for docs in doc_lists:
+        for d in docs:
+            sid = trip_id(
+                d.get("train_no", ""),
+                d.get("date", ""),
+                d.get("origine", ""),
+                d.get("destination", ""),
+            )
+            if sid in seen:
+                continue
+            seen.add(sid)
+            out.append(d)
+    return out
