@@ -55,6 +55,11 @@ class SearchService:
         self._sync = sync_repo
         self._sncf = sncf
         self._cache = cache_repo
+        # Recalculs de cache déclenchés en arrière-plan (stale-while-revalidate).
+        # _refresh_keys : dédup par origine ; _refresh_tasks : garde une réf forte
+        # aux tâches pour éviter leur ramassage prématuré par le GC.
+        self._refresh_keys: set[str] = set()
+        self._refresh_tasks: set[asyncio.Task] = set()
 
     async def search_stations(self, q: str, *, limit: int = 15) -> list[StationSuggestion]:
         q = (q or "").strip()
@@ -158,15 +163,44 @@ class SearchService:
         last_sync = await self._sync.get_last_sync_at()
         key = self._cache_key(origin)
         cached = await self._cache.get(key)
-        if cached and last_sync is not None and cached.get("sync_at") == last_sync:
+
+        # Stale-while-revalidate : si une réponse existe en cache, on la sert
+        # immédiatement, même si elle date d'une sync antérieure. Le calcul lourd
+        # (~30 s sur les grandes origines) ne doit jamais bloquer la requête.
+        if cached:
+            if last_sync is not None and cached.get("sync_at") != last_sync:
+                self._schedule_refresh(origin, key)
             payload = {**cached["payload"], "origin": origin.strip()}
             return SearchResponse(**payload)
 
+        # Démarrage à froid : aucune entrée en cache (origine jamais réchauffée).
+        # Le calcul synchrone est ici inévitable, mais le résultat est ensuite mis
+        # en cache pour toutes les requêtes suivantes.
         resp = await self._compute_search_response(origin, fresh_prices=False)
         await self._cache.set(
             key, resp.model_dump(mode="json"), sync_at=resp.last_sync_at
         )
         return resp
+
+    def _schedule_refresh(self, origin: str, key: str) -> None:
+        """Planifie un recalcul de cache en tâche de fond (dédupliqué par clé)."""
+        if key in self._refresh_keys:
+            return
+        self._refresh_keys.add(key)
+        task = asyncio.create_task(self._refresh_entry(origin, key))
+        self._refresh_tasks.add(task)
+        task.add_done_callback(self._refresh_tasks.discard)
+
+    async def _refresh_entry(self, origin: str, key: str) -> None:
+        try:
+            resp = await self._compute_search_response(origin, fresh_prices=False)
+            await self._cache.set(
+                key, resp.model_dump(mode="json"), sync_at=resp.last_sync_at
+            )
+        except Exception:
+            logger.exception("Background cache refresh failed for origin %r", origin)
+        finally:
+            self._refresh_keys.discard(key)
 
     async def warm_cache(self) -> int:
         """Pré-calcule la réponse /search de chaque origine après une sync."""
