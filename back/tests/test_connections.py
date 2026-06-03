@@ -202,6 +202,101 @@ class TestDeduplication(unittest.TestCase):
         self.assertEqual(len(three), 1)
         self.assertEqual(len({j.fingerprint for j in journeys}), len(journeys))
 
+    def test_same_schedule_different_train_numbers_one_journey(self):
+        """Cas Angers→Paris : 12472 vs 8922, mêmes horaires → un seul parcours."""
+        leg1 = _seg(
+            train_no="5224",
+            origine="LILLE (intramuros)",
+            destination="ANGERS SAINT LAUD",
+            heure_depart="09:36",
+            heure_arrivee="14:02",
+            origine_metropolis="Lille",
+            destination_metropolis="Angers",
+        )
+        leg2a = _seg(
+            train_no="12472",
+            origine="ANGERS SAINT LAUD",
+            destination="PARIS (intramuros)",
+            heure_depart="15:44",
+            heure_arrivee="17:27",
+            origine_metropolis="Angers",
+            destination_metropolis="Paris",
+        )
+        leg2b = _seg(
+            train_no="8922",
+            origine="ANGERS SAINT LAUD",
+            destination="PARIS (intramuros)",
+            heure_depart="15:44",
+            heure_arrivee="17:27",
+            origine_metropolis="Angers",
+            destination_metropolis="Paris",
+        )
+        leg3 = _seg(
+            train_no="6925",
+            origine="PARIS (intramuros)",
+            destination="LYON ST EXUPERY TGV",
+            heure_depart="18:14",
+            heure_arrivee="20:05",
+            origine_metropolis="Paris",
+            destination_metropolis="Lyon",
+        )
+        journeys = find_all_connected_journeys(
+            [leg1],
+            [leg2a, leg2b, leg3],
+            origin_metropolis="Lille",
+            max_connections=2,
+        )
+        three = [j for j in journeys if j.connection_count == 2]
+        self.assertEqual(len(three), 1)
+        self.assertEqual(three[0].legs[1].train_no, "12472")
+
+    def test_different_middle_departure_keeps_two_journeys(self):
+        """14:44 vs 15:44 depuis Angers = deux options distinctes."""
+        leg1 = _seg(
+            train_no="5224",
+            origine="LILLE (intramuros)",
+            destination="ANGERS SAINT LAUD",
+            heure_depart="09:36",
+            heure_arrivee="14:02",
+            origine_metropolis="Lille",
+            destination_metropolis="Angers",
+        )
+        leg2_early = _seg(
+            train_no="8834",
+            origine="ANGERS SAINT LAUD",
+            destination="PARIS (intramuros)",
+            heure_depart="14:44",
+            heure_arrivee="16:08",
+            origine_metropolis="Angers",
+            destination_metropolis="Paris",
+        )
+        leg2_late = _seg(
+            train_no="12472",
+            origine="ANGERS SAINT LAUD",
+            destination="PARIS (intramuros)",
+            heure_depart="15:44",
+            heure_arrivee="17:27",
+            origine_metropolis="Angers",
+            destination_metropolis="Paris",
+        )
+        leg3 = _seg(
+            train_no="6925",
+            origine="PARIS (intramuros)",
+            destination="LYON ST EXUPERY TGV",
+            heure_depart="18:14",
+            heure_arrivee="20:05",
+            origine_metropolis="Paris",
+            destination_metropolis="Lyon",
+        )
+        journeys = find_all_connected_journeys(
+            [leg1],
+            [leg2_early, leg2_late, leg3],
+            origin_metropolis="Lille",
+            max_connections=2,
+        )
+        three = [j for j in journeys if j.connection_count == 2]
+        self.assertEqual(len(three), 2)
+
 
 class TestThreeLegJourney(unittest.TestCase):
     def test_lille_paris_lyon_marseille(self):
