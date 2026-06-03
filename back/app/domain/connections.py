@@ -88,7 +88,7 @@ class ConnectedJourney:
 
     @property
     def fingerprint(self) -> str:
-        """Empreinte affichable (trains + horaires + gares), indépendante des segment_id open data."""
+        """Empreinte horaire + lieux (sans train_no ni segment_id open data)."""
         return journey_fingerprint(self)
 
 
@@ -99,12 +99,18 @@ def _leg_origin_key(leg: TripSegment) -> str:
     return normalize_station(leg.origine)
 
 
+def _leg_destination_key(leg: TripSegment) -> str:
+    if leg.destination_metropolis:
+        return f"metro:{leg.destination_metropolis}"
+    return normalize_station(leg.destination)
+
+
 def leg_fingerprint(leg: TripSegment) -> str:
+    """Créneau réservable : date, horaires, origine et destination (pas le n° de train)."""
     dep = (leg.heure_depart or "")[:5]
     arr = (leg.heure_arrivee or "")[:5]
     return (
-        f"{leg.date}|{dep}|{arr}|{leg.train_no}|"
-        f"{_leg_origin_key(leg)}|{normalize_station(leg.destination)}"
+        f"{leg.date}|{dep}|{arr}|{_leg_origin_key(leg)}|{_leg_destination_key(leg)}"
     )
 
 
@@ -113,15 +119,14 @@ def journey_fingerprint(journey: ConnectedJourney) -> str:
 
 
 def direct_trip_fingerprint(doc: dict) -> str:
-    """Empreinte d'un trajet direct (déduplication open data)."""
+    """Empreinte d'un trajet direct (date, horaires, lieux — sans train_no)."""
     dep = (doc.get("heure_depart") or "")[:5]
     arr = (doc.get("heure_arrivee") or "")[:5]
     orig_metro = doc.get("origine_metropolis")
+    dest_metro = doc.get("destination_metropolis")
     orig = f"metro:{orig_metro}" if orig_metro else normalize_station(doc.get("origine", ""))
-    return (
-        f"{doc.get('date', '')}|{dep}|{arr}|{doc.get('train_no', '')}|"
-        f"{orig}|{normalize_station(doc.get('destination', ''))}"
-    )
+    dest = f"metro:{dest_metro}" if dest_metro else normalize_station(doc.get("destination", ""))
+    return f"{doc.get('date', '')}|{dep}|{arr}|{orig}|{dest}"
 
 
 def dedupe_connected_journeys(
