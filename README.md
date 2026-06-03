@@ -1,10 +1,12 @@
 # MaxTracker
 
-**Repérez rapidement les trains TGV Max à 0 €** depuis votre gare de départ, directs ou avec correspondance (TGV INOUI, Intercités, Intercités de nuit), sans parcourir destination par destination sur SNCF Connect.
+Site web gratuit pour repérer les trains **TGV Max à 0 €** depuis votre gare de départ, en direct ou avec correspondance (TGV INOUI, Intercités, Intercités de nuit), sans parcourir destination par destination sur SNCF Connect.
 
-MaxTracker aide les titulaires d'un abonnement **MAX Jeune ou MAX Senior** (offres TGV Max) à trouver les trajets éligibles à **0 €** sur les **30 prochains jours**.
-C'est un service **gratuit, indépendant et non officiel** : il ne vend pas de billets et ne réserve pas à votre place.
-Il agrège les données ouvertes SNCF, compose des parcours multi-segments lorsque c'est possible, puis vous **redirige** vers [SNCF Connect](https://www.sncf-connect.com) pour réserver.
+**Pour qui ?** Titulaires d'un abonnement **MAX Jeune ou MAX Senior** (offres TGV Max).
+
+**Ce que c'est :** un outil de repérage **indépendant et non officiel** qui agrège les [données ouvertes SNCF](https://data.sncf.com/explore/dataset/tgvmax/), compose des parcours multi-segments lorsque c'est possible, puis vous **redirige** vers [SNCF Connect](https://www.sncf-connect.com) pour réserver.
+
+**Ce que ce n'est pas :** un site SNCF, un service de vente de billets ni une application de réservation. MaxTracker ne réserve pas à votre place et ne collecte aucun identifiant SNCF Connect.
 
 ---
 
@@ -22,13 +24,11 @@ Il agrège les données ouvertes SNCF, compose des parcours multi-segments lorsq
 
 ## À quoi ça sert ?
 
-Vous avez un abonnement TGV Max et vous cherchez un trajet à **0 €** dans les **30 prochains jours**, sans passer des heures sur SNCF Connect.
-MaxTracker interroge une base alimentée par le jeu ouvert [« Disponibilités TGV Max »](https://data.sncf.com/explore/dataset/tgvmax/) publié par SNCF Voyageurs.
+Si vous avez un abonnement TGV Max, MaxTracker répond à une question simple : *« Quels trajets à 0 € puis-je prendre depuis ma gare dans les 30 prochains jours ? »*
 
- L'application affiche les **trajets directs** et, lorsque les créneaux s'enchaînent correctement, des **parcours avec correspondance** (jusqu'à 2).
+L'application interroge une base alimentée par le jeu ouvert [« Disponibilités TGV Max »](https://data.sncf.com/explore/dataset/tgvmax/) publié par SNCF Voyageurs. Elle affiche les **trajets directs** et, lorsque les créneaux s'enchaînent correctement, des **parcours avec correspondance** (jusqu'à 2).
 
-La SNCF publie une nouvelle vague de données **chaque jour en début de matinée** (aux alentours de 6 h 30).
-MaxTracker importe ce flux environ **toutes les 15 minutes** : ce n'est pas du temps réel, mais cela permet de rafraîchir la base (trajets éligibles et heures de départ).
+La SNCF publie une nouvelle vague de données **chaque jour en début de matinée** (aux alentours de 6 h 30). MaxTracker importe ce flux environ **toutes les 15 minutes** : ce n'est pas du temps réel, mais cela permet de rafraîchir régulièrement les trajets éligibles et les heures de départ.
 
 Pour le détail des filtres, des parcours composés, des horodatages affichés et des écarts possibles avec SNCF Connect, voir la page **À propos** dans l'application (`#/about`) ou le fichier [front/src/pages/About.jsx](front/src/pages/About.jsx).
 
@@ -49,12 +49,14 @@ Pour le détail des filtres, des parcours composés, des horodatages affichés e
 
 ## Comment l'utiliser
 
+Ouvrez l'application web, puis :
+
 1. **Saisissez votre gare de départ** (au moins 3 lettres pour l'autocomplétion)
 2. Lancez la recherche
 3. Parcourez les résultats **par ville de destination** (trains directs et parcours composés, triés par date)
-4. Affinez avec les **filtres** — panneau *Filtres simples* / *Filtres avancés* (ou feuille mobile)
+4. Affinez avec les **filtres** dans le panneau *Filtres simples* / *Filtres avancés* (ou la feuille mobile)
 5. Changez de vue : **Liste**, **Calendrier** ou **Pics horaires**
-6. Ouvrez **SNCF Connect** depuis chaque train (un lien par segment sur les parcours avec correspondance)
+6. Ouvrez **SNCF Connect** depuis chaque train pour réserver (un lien par segment sur les parcours avec correspondance)
 
 **Astuces**
 
@@ -99,10 +101,9 @@ Si la gare n'est **pas desservie** par l'offre TGV Max, un message d'erreur vous
 - **Vérifiez toujours sur SNCF Connect** avant de vous déplacer. Un train éligible affiché ici peut avoir été réservé entre deux mises à jour.
 - **Fenêtre de 30 jours** : seuls les départs dans les 30 prochains jours sont indexés. Le filtre *Horizon* restreint cette plage côté interface.
 - **Parcours composés** : chaque segment doit être réservable à 0 € ; temps de correspondance minimum 25 min (même gare) ou 50 min (même métropole). Ce ne sont pas des itinéraires garantis par la SNCF, mais des enchaînements calculés depuis l'open data.
-- **Pas de réservation ici** : MaxTracker est un outil de repérage ; la vente et le paiement restent sur les canaux officiels SNCF.
+- **Pas de réservation ici** : MaxTracker affiche les créneaux éligibles ; la vente et le paiement restent sur les canaux officiels SNCF.
 - **Écarts possibles avec SNCF Connect** : l'app officielle s'appuie sur des systèmes privés en temps réel ; MaxTracker n'utilise que le flux public open data.
-- **Cohérence** : pour garantir une bonne cohérence des données entre MaxTracker et SNCF Connect, il est préférable d'être connecté à ce dernier au préalable.
-- **Service non officiel** : MaxTracker n'est pas affilié à la SNCF. Les marques citées appartiennent à leurs propriétaires respectifs.
+- **Service non officiel** : MaxTracker n'est pas affilié à la SNCF. Les marques citées (« SNCF », « TGV Max », « SNCF Connect », etc.) appartiennent à leurs propriétaires respectifs.
 
 ---
 
@@ -119,6 +120,8 @@ Il n'y a pas de support commercial ni de lien avec la SNCF pour les disponibilit
 
 <details>
 <summary><h2>Pour les développeurs</h2></summary>
+
+Ce dépôt contient le code source de MaxTracker (API FastAPI + interface React). Les sections ci-dessus décrivent le service tel qu'un utilisateur le voit ; ce qui suit concerne l'installation et le développement local.
 
 ### Démarrage local
 
@@ -208,7 +211,7 @@ tgvmax-platform/
 
 Optionnel (valeurs par défaut dans `app/config.py`) : `sync_interval_min` (15), `rate_limit_per_min` (10).
 
-**Frontend** (build) : `REACT_APP_BACKEND_URL` — URL du backend **sans** `/api`.
+**Frontend** (build) : `REACT_APP_BACKEND_URL`, l'URL du backend **sans** `/api`.
 
 ### API
 
@@ -238,7 +241,7 @@ Préfixe : `/api`
 | Frontend | React 19, Tailwind CSS, Radix UI, Recharts |
 | Backend | FastAPI, Uvicorn, Motor, APScheduler |
 | Base | MongoDB |
-| Source | [Open Data SNCF — tgvmax](https://data.sncf.com/explore/dataset/tgvmax/) |
+| Source | [Open Data SNCF, jeu tgvmax](https://data.sncf.com/explore/dataset/tgvmax/) |
 
 ```mermaid
 flowchart LR
