@@ -6,8 +6,9 @@ import FiltersPanel from "@/components/FiltersPanel";
 import MobileFiltersSheet from "@/components/MobileFiltersSheet";
 import {
   enrichSearchGroups,
+  connectedTripMatchesFilters,
+  destinationGroupResultsEqual,
   tripMatchesFilters,
-  tripsArrayEqual,
 } from "@/lib/tripTime";
 import DestinationGroup from "@/components/DestinationGroup";
 import CalendarView from "@/components/CalendarView";
@@ -101,18 +102,22 @@ export default function Home({ syncInfo, registerRerunSearch }) {
     for (const g of preparedGroups) {
       if (hiddenSet.has(g.destination_city)) continue;
       const trips = [];
+      const connected_trips = [];
       for (const t of g.trips) {
         if (tripMatchesFilters(t, filters)) trips.push(t);
       }
-      if (trips.length === 0) continue;
-      total += trips.length;
+      for (const ct of g.connected_trips || []) {
+        if (connectedTripMatchesFilters(ct, filters)) connected_trips.push(ct);
+      }
+      if (trips.length === 0 && connected_trips.length === 0) continue;
+      total += trips.length + connected_trips.length;
       const key = g.destination_city;
       const prev = cache.get(key);
-      if (prev && tripsArrayEqual(prev.trips, trips)) {
+      const entry = { ...g, trips, connected_trips, trip_count: trips.length + connected_trips.length };
+      if (prev && destinationGroupResultsEqual(prev, entry)) {
         nextCache.set(key, prev);
         out.push(prev);
       } else {
-        const entry = { ...g, trips, trip_count: trips.length };
         nextCache.set(key, entry);
         out.push(entry);
       }
@@ -123,7 +128,13 @@ export default function Home({ syncInfo, registerRerunSearch }) {
 
   const allFilteredTrips = useMemo(() => {
     if (tab === "list") return [];
-    return filteredGroups.flatMap((g) => g.trips);
+    return filteredGroups.flatMap((g) => [
+      ...g.trips,
+      ...(g.connected_trips || []).map((c) => ({
+        date: c.date,
+        heure_depart: c.heure_depart,
+      })),
+    ]);
   }, [filteredGroups, tab]);
 
   useEffect(() => {
