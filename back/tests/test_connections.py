@@ -152,6 +152,129 @@ class TestLilleMarseilleViaParis(unittest.TestCase):
         self.assertEqual(len(journeys), 2)
 
 
+class TestDeduplication(unittest.TestCase):
+    def test_same_trains_different_segment_ids_one_journey(self):
+        """Doublons open data : même train, libellés de gare différents."""
+        leg1a = _seg(
+            train_no="5220",
+            origine="LILLE EUROPE",
+            destination="RENNES",
+            heure_depart="07:52",
+            heure_arrivee="11:17",
+            origine_metropolis="Lille",
+            destination_metropolis="Rennes",
+            segment_id="a1",
+        )
+        leg1b = _seg(
+            train_no="5220",
+            origine="LILLE (intramuros)",
+            destination="RENNES",
+            heure_depart="07:52",
+            heure_arrivee="11:17",
+            origine_metropolis="Lille",
+            destination_metropolis="Rennes",
+            segment_id="b1",
+        )
+        leg2 = _seg(
+            train_no="8044",
+            origine="RENNES",
+            destination="PARIS (intramuros)",
+            heure_depart="12:27",
+            heure_arrivee="13:57",
+            origine_metropolis="Rennes",
+            destination_metropolis="Paris",
+        )
+        leg3 = _seg(
+            train_no="7331",
+            origine="PARIS (intramuros)",
+            destination="ARRAS",
+            heure_depart="15:51",
+            heure_arrivee="16:40",
+            origine_metropolis="Paris",
+        )
+        journeys = find_all_connected_journeys(
+            [leg1a, leg1b],
+            [leg2, leg3],
+            origin_metropolis="Lille",
+            max_connections=2,
+        )
+        three = [j for j in journeys if j.connection_count == 2]
+        self.assertEqual(len(three), 1)
+        self.assertEqual(len({j.fingerprint for j in journeys}), len(journeys))
+
+
+class TestThreeLegJourney(unittest.TestCase):
+    def test_lille_paris_lyon_marseille(self):
+        leg1 = _seg(
+            train_no="1",
+            origine="LILLE EUROPE",
+            destination="PARIS NORD",
+            heure_depart="07:00",
+            heure_arrivee="09:00",
+            origine_metropolis="Lille",
+            destination_metropolis="Paris",
+        )
+        leg2 = _seg(
+            train_no="2",
+            origine="PARIS NORD",
+            destination="LYON PART DIEU",
+            heure_depart="10:00",
+            heure_arrivee="12:00",
+            origine_metropolis="Paris",
+            destination_metropolis="Lyon",
+        )
+        leg3 = _seg(
+            train_no="3",
+            origine="LYON PART DIEU",
+            destination="MARSEILLE ST CHARLES",
+            heure_depart="13:00",
+            heure_arrivee="16:00",
+            origine_metropolis="Lyon",
+            destination_metropolis="Marseille",
+        )
+        hub_pool = [leg2, leg3]
+        journeys = find_all_connected_journeys(
+            [leg1],
+            hub_pool,
+            origin_metropolis="Lille",
+            destination_metropolis="Marseille",
+            max_connections=2,
+        )
+        three = [j for j in journeys if j.connection_count == 2]
+        self.assertEqual(len(three), 1)
+        self.assertEqual(three[0].hub_metropolis, "Paris · Lyon")
+        self.assertEqual(len(three[0].legs), 3)
+
+    def test_max_connections_one_excludes_three_leg(self):
+        leg1 = _seg(
+            origine_metropolis="Lille",
+            destination_metropolis="Paris",
+            heure_arrivee="09:00",
+        )
+        leg2 = _seg(
+            train_no="2",
+            origine_metropolis="Paris",
+            destination_metropolis="Lyon",
+            heure_depart="10:00",
+            heure_arrivee="12:00",
+        )
+        leg3 = _seg(
+            train_no="3",
+            origine_metropolis="Lyon",
+            destination_metropolis="Marseille",
+            heure_depart="13:00",
+            heure_arrivee="16:00",
+        )
+        all_j = find_all_connected_journeys(
+            [leg1], [leg2, leg3], max_connections=2
+        )
+        limited = find_all_connected_journeys(
+            [leg1], [leg2, leg3], max_connections=1
+        )
+        self.assertTrue(any(j.connection_count == 2 for j in all_j))
+        self.assertFalse(any(j.connection_count == 2 for j in limited))
+
+
 class TestStrasbourgNiceViaLyon(unittest.TestCase):
     def test_lyon_hub(self):
         leg1 = _seg(
