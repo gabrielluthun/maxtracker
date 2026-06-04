@@ -1,6 +1,7 @@
 import { ShieldAlert, Github, ExternalLink } from "lucide-react";
 
 const GITHUB_REPO_URL = "https://github.com/gabrielluthun/tgvmax-platform";
+const REPORT_CONNECTION_LIMIT_URL = `${GITHUB_REPO_URL}/blob/develop/doc/rapport-limite-correspondances.md`;
 
 const ABOUT_FILTER_SECTIONS = [
   {
@@ -16,7 +17,7 @@ const ABOUT_FILTER_SECTIONS = [
       {
         name: "Correspondances max",
         effect:
-          "Direct (défaut) : trajets sans changement de train. 1 ou 2 : inclut les parcours composés avec jusqu'à une ou deux correspondances (3 trains au total).",
+          "Direct (défaut) : trajets sans changement de train | 1 correspondance : inclut les parcours composés avec une correspondance (2 trains au total).",
       },
     ],
   },
@@ -245,10 +246,22 @@ export default function About() {
             <p className="m-0">
               <strong className="text-slate-800 dark:text-slate-200">Parcours composés.</strong> <br />Chaque ligne open data
               correspond à un segment (une origine, une destination, un train). MaxTracker enchaîne jusqu&apos;à{" "}
-              <strong className="text-slate-800 dark:text-slate-200">deux correspondances</strong> via les
+              <strong className="text-slate-800 dark:text-slate-200">une correspondance</strong> via les
               grandes métropoles (Paris, Lyon, Lille, etc.), en respectant des temps de correspondance raisonnables (25 min sur même
               gare, 50 min sur même métropole). <br /> Ce ne sont pas des itinéraires officiels garantis par la SNCF, mais des
               combinaisons calculées à partir des instantanés open data : vérifiez chaque segment sur SNCF Connect.
+            </p>
+          </div>
+
+          <div
+            className="rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 px-4 py-3"
+            data-testid="about-connections-limit"
+          >
+            <p className="m-0">
+              <strong className="text-slate-800 dark:text-slate-200">Pourquoi une seule correspondance ?</strong>{" "}
+              <br />
+              Le moteur peut composer des parcours jusqu&apos;à deux correspondances (soit trois trains), mais cette profondeur n&apos;est pas proposée dans l&apos;interface pour des raisons techniques.{" "} <br />
+              Voir le <a href={REPORT_CONNECTION_LIMIT_URL} target="_blank" rel="noopener noreferrer" className="underline hover:text-[#0A2540] dark:hover:text-slate-200">rapport de limitation</a> pour le détail des mesures.
             </p>
           </div>
 

@@ -26,7 +26,10 @@ Site web gratuit pour repérer les trains **TGV Max à 0 €** depuis votre gare
 
 Si vous avez un abonnement TGV Max, MaxTracker répond à une question simple : *« Quels trajets à 0 € puis-je prendre depuis ma gare dans les 30 prochains jours ? »*
 
-L'application interroge une base alimentée par le jeu ouvert [« Disponibilités TGV Max »](https://data.sncf.com/explore/dataset/tgvmax/) publié par SNCF Voyageurs. Elle affiche les **trajets directs** et, lorsque les créneaux s'enchaînent correctement, des **parcours avec correspondance** (jusqu'à 2).
+L'application interroge une base alimentée par le jeu ouvert [« Disponibilités TGV Max »](https://data.sncf.com/explore/dataset/tgvmax/) publié par SNCF Voyageurs. Elle affiche les **trajets directs** et, lorsque les créneaux s'enchaînent correctement, des **parcours avec correspondance** (jusqu'à 1).
+
+Le moteur sait composer des parcours jusqu'à **2 correspondances** (3 trains), mais cette profondeur n'est pas proposée en production. 
+Voir le [rapport de limitation](doc/rapport-limite-correspondances.md) pour le détail des mesures.
 
 La SNCF publie une nouvelle vague de données **chaque jour en début de matinée** (aux alentours de 6 h 30). MaxTracker importe ce flux environ **toutes les 15 minutes** : ce n'est pas du temps réel, mais cela permet de rafraîchir régulièrement les trajets éligibles et les heures de départ.
 
@@ -37,7 +40,7 @@ Pour le détail des filtres, des parcours composés, des horodatages affichés e
 ## Fonctionnalités
 
 - Recherche par gare de départ, résultats groupés par ville d'arrivée
-- **Trajets directs** et **parcours avec correspondance** (filtre : direct, 1 ou 2 correspondances)
+- **Trajets directs** et **parcours avec correspondance** (filtre : direct ou 1 correspondance)
 - **Filtres simples** : type de train, correspondances max
 - **Filtres avancés** : horizon de dates (7 / 14 / 30 j, défaut 30 j), créneaux horaires, durée totale max (≤ 3 h / 5 h / 8 h), départ aujourd'hui, et départ week-end uniquement
 - Vues **Liste**, **Calendrier** (30 jours) et **Pics horaires**
@@ -62,7 +65,7 @@ Ouvrez l'application web, puis :
 
 - **Gares favorites** enregistrées localement dans votre navigateur
 - **Masquer** une destination que vous ne voulez plus voir (réversible via « Réafficher tout »)
-- **Correspondances max** : *Direct* par défaut ; passez à *1* ou *2* pour voir les parcours composés
+- **Correspondances max** : *Direct* par défaut ; passez à *1 correspondance* pour voir les parcours composés
 - **Horizon de dates** : 30 j par défaut ; réduisez à 7 ou 14 j pour alléger la liste
 - **Durée totale max** : utile pour les allers-retours à la journée (porte à porte, attentes incluses)
 - Badge **« Départ possible aujourd'hui »** : au moins un départ encore possible aujourd'hui vers cette ville
@@ -80,7 +83,7 @@ Ouvrez l'application web, puis :
 | Voir tous les départs à 0 € depuis une gare | Recherche par gare de départ |
 | Comparer les destinations | Liste groupée par ville |
 | Ne garder que les trajets directs | Filtre *Correspondances max* → Direct |
-| Autoriser 1 ou 2 changements de train | Filtre *Correspondances max* → 1 ou 2 |
+| Autoriser 1 changement de train | Filtre *Correspondances max* → 1 |
 | Limiter aux 7 / 14 / 30 prochains jours | Filtre *Horizon de dates* |
 | Aller-retour à la journée | Filtre *Durée totale max* |
 | Ne garder que les départs du jour | Filtre *Départ aujourd'hui* |
@@ -100,7 +103,7 @@ Si la gare n'est **pas desservie** par l'offre TGV Max, un message d'erreur vous
 
 - **Vérifiez toujours sur SNCF Connect** avant de vous déplacer. Un train éligible affiché ici peut avoir été réservé entre deux mises à jour.
 - **Fenêtre de 30 jours** : seuls les départs dans les 30 prochains jours sont indexés. Le filtre *Horizon* restreint cette plage côté interface.
-- **Parcours composés** : chaque segment doit être réservable à 0 € ; temps de correspondance minimum 25 min (même gare) ou 50 min (même métropole). Ce ne sont pas des itinéraires garantis par la SNCF, mais des enchaînements calculés depuis l'open data.
+- **Parcours composés** : chaque trajet doit être réservable à 0 € ; temps de correspondance minimum 25 min (même gare) ou 50 min (même métropole). Ce ne sont pas des itinéraires garantis par la SNCF, mais des enchaînements calculés depuis l'open data. L'interface se limite à **1 correspondance** (2 trains) : voir [rapport de limitation](doc/rapport-limite-correspondances.md).
 - **Pas de réservation ici** : MaxTracker affiche les créneaux éligibles ; la vente et le paiement restent sur les canaux officiels SNCF.
 - **Écarts possibles avec SNCF Connect** : l'app officielle s'appuie sur des systèmes privés en temps réel ; MaxTracker n'utilise que le flux public open data.
 - **Service non officiel** : MaxTracker n'est pas affilié à la SNCF. Les marques citées (« SNCF », « TGV Max », « SNCF Connect », etc.) appartiennent à leurs propriétaires respectifs.
@@ -232,6 +235,7 @@ Préfixe : `/api`
 |----------|---------|
 | [doc/regles-de-gestion.md](doc/regles-de-gestion.md) | Règles de gestion |
 | [doc/contraintes.md](doc/contraintes.md) | Contraintes données, métier, légales |
+| [doc/rapport-limite-correspondances.md](doc/rapport-limite-correspondances.md) | Limitation à 1 correspondance (taille cache MongoDB) |
 | [front/src/pages/About.jsx](front/src/pages/About.jsx) | Page À propos (parcours, filtres, sync) |
 
 ### Stack

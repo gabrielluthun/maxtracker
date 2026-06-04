@@ -141,7 +141,7 @@ export function createFilterContext(filters) {
       today,
       filters.dateHorizonDays ?? DEFAULT_DATE_HORIZON_DAYS
     ),
-    maxConn: filters.maxConnections ?? 2,
+    maxConn: filters.maxConnections ?? 1,
     maxDuration: filters.maxDurationMinutes ?? null,
     allTrainTypes:
       filters.showInoui && filters.showIntercites && filters.showIntercitesNuit,
@@ -189,7 +189,7 @@ export function tripMatchesFilters(t, filters) {
   return tripMatchesFiltersCtx(t, createFilterContext(filters));
 }
 
-/** Parcours avec correspondance ; filtré selon maxConnections (0–2). */
+/** Parcours avec correspondance ; filtré selon maxConnections (0–1). */
 export function connectedTripMatchesFilters(ct, filters) {
   return connectedTripMatchesFiltersCtx(ct, createFilterContext(filters));
 }

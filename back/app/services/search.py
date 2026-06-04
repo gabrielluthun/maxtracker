@@ -177,9 +177,14 @@ class SearchService:
         # Le calcul synchrone est ici inévitable, mais le résultat est ensuite mis
         # en cache pour toutes les requêtes suivantes.
         resp = await self._compute_search_response(origin, fresh_prices=False)
-        await self._cache.set(
-            key, resp.model_dump(mode="json"), sync_at=resp.last_sync_at
-        )
+        try:
+            await self._cache.set(
+                key, resp.model_dump(mode="json"), sync_at=resp.last_sync_at
+            )
+        except Exception:
+            # Ne jamais faire échouer la requête à cause de la mise en cache
+            # (ex. payload dépassant la limite de 16 Mo d'un document Mongo).
+            logger.exception("Cache set failed for origin %r", origin)
         return resp
 
     def _schedule_refresh(self, origin: str, key: str) -> None:
