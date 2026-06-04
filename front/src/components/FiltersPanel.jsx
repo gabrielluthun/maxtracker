@@ -226,11 +226,10 @@ function FiltersPanel({ filters, onChange, hiddenCount, onResetHidden, totalDest
 
           <div>
             <div className="font-medium text-slate-800 dark:text-slate-100 mb-2">Correspondances max</div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {[
                 { value: 0, label: "Direct", testId: "filter-connections-0" },
-                { value: 1, label: "1", testId: "filter-connections-1" },
-                { value: 2, label: "2", testId: "filter-connections-2" },
+                { value: 1, label: "1 correspondance", testId: "filter-connections-1" },
               ].map(({ value, label, testId }) => (
                 <button
                   key={value}
