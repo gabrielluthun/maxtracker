@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Search, Star, X, MapPin } from "lucide-react";
+import { Search, Star, X, MapPin, Loader2 } from "lucide-react";
 import { searchStations } from "@/lib/api";
 import { getFavorites, toggleFavorite } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
+const STATIONS_DEBOUNCE_MS = 120;
+
 export default function SearchBar({ origin, onOriginChange, onSearch, loading }) {
   const [query, setQuery] = useState(origin?.name || "");
   const [suggestions, setSuggestions] = useState([]);
+  const [stationsLoading, setStationsLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [favs, setFavs] = useState(getFavorites());
   const [active, setActive] = useState(-1);
@@ -24,12 +27,29 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
 
   useEffect(() => {
     let cancelled = false;
+
+    if (query.length < 3) {
+      setSuggestions([]);
+      setStationsLoading(false);
+      return;
+    }
+
+    setStationsLoading(true);
+    setSuggestions([]);
+
     const t = setTimeout(async () => {
-      if (query.length < 3) { setSuggestions([]); return; }
-      const res = await searchStations(query);
-      if (!cancelled) setSuggestions(res);
-    }, 180);
-    return () => { cancelled = true; clearTimeout(t); };
+      try {
+        const res = await searchStations(query);
+        if (!cancelled) setSuggestions(res);
+      } finally {
+        if (!cancelled) setStationsLoading(false);
+      }
+    }, STATIONS_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [query]);
 
   const pick = (s) => {
@@ -72,9 +92,16 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
                 onFocus={() => setOpen(true)}
                 onKeyDown={onKeyDown}
                 placeholder="Tapez au moins 3 lettres pour trouver une gare"
+                aria-busy={stationsLoading}
                 className="w-full h-14 pl-12 pr-12 rounded-xl bg-slate-50 border-2 border-slate-200 focus:border-[#0A2540] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#0A2540]/10 text-lg"
               />
-              {origin && (
+              {stationsLoading ? (
+                <Loader2
+                  className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 animate-spin"
+                  data-testid="stations-loading"
+                  aria-hidden
+                />
+              ) : origin ? (
                 <button
                   data-testid="favorite-btn"
                   onClick={onFav}
@@ -83,7 +110,7 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
                 >
                   <Star className={cn("h-5 w-5", fav ? "fill-amber-400 text-amber-400" : "text-slate-400")} />
                 </button>
-              )}
+              ) : null}
             </div>
             {open && suggestions.length > 0 && (
               <div className="absolute z-30 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto" data-testid="suggestions-list">
@@ -107,7 +134,16 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
                 ))}
               </div>
             )}
-            {open && query.length >= 3 && suggestions.length === 0 && (
+            {open && query.length >= 3 && stationsLoading && (
+              <div
+                className="absolute z-30 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl p-4 text-sm text-slate-500 flex items-center gap-2"
+                data-testid="suggestions-loading"
+              >
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
+                Recherche de gares…
+              </div>
+            )}
+            {open && query.length >= 3 && !stationsLoading && suggestions.length === 0 && (
               <div className="absolute z-30 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl p-4 text-sm text-slate-500" data-testid="suggestions-empty">
                 Aucune gare trouvée pour « {query} »
               </div>
