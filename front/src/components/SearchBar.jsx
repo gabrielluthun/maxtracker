@@ -14,6 +14,7 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
   const [favs, setFavs] = useState(getFavorites());
   const [active, setActive] = useState(-1);
   const wrapRef = useRef(null);
+  const cacheRef = useRef(new Map());
 
   useEffect(() => { setQuery(origin?.name || ""); }, [origin]);
 
@@ -26,7 +27,7 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    let active = true;
 
     if (query.length < 3) {
       setSuggestions([]);
@@ -34,21 +35,37 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
       return;
     }
 
+    const cacheKey = query.trim().toLowerCase();
+    const cached = cacheRef.current.get(cacheKey);
+    if (cached) {
+      setSuggestions(cached);
+      setStationsLoading(false);
+      return;
+    }
+
     setStationsLoading(true);
     setSuggestions([]);
 
+    const controller = new AbortController();
+
     const t = setTimeout(async () => {
       try {
-        const res = await searchStations(query);
-        if (!cancelled) setSuggestions(res);
+        const res = await searchStations(query, { signal: controller.signal });
+        if (active) {
+          cacheRef.current.set(cacheKey, res);
+          setSuggestions(res);
+        }
+      } catch (e) {
+        if (active && e?.code !== "ERR_CANCELED") throw e;
       } finally {
-        if (!cancelled) setStationsLoading(false);
+        if (active) setStationsLoading(false);
       }
     }, STATIONS_DEBOUNCE_MS);
 
     return () => {
-      cancelled = true;
+      active = false;
       clearTimeout(t);
+      controller.abort();
     };
   }, [query]);
 
