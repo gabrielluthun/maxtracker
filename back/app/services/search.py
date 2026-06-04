@@ -37,9 +37,6 @@ from app.services.sncf.connect import build_sncf_connect_url
 
 logger = logging.getLogger("maxtracker")
 
-# Concurrence du pré-calcul de cache (nb d'origines calculées en parallèle).
-CACHE_WARM_CONCURRENCY = 8
-
 
 class SearchService:
     def __init__(
@@ -60,6 +57,7 @@ class SearchService:
         # aux tâches pour éviter leur ramassage prématuré par le GC.
         self._refresh_keys: set[str] = set()
         self._refresh_tasks: set[asyncio.Task] = set()
+        self._warm_task: asyncio.Task | None = None
 
     async def search_stations(self, q: str, *, limit: int = 15) -> list[StationSuggestion]:
         q = (q or "").strip()
@@ -207,6 +205,19 @@ class SearchService:
         finally:
             self._refresh_keys.discard(key)
 
+    def schedule_warm_cache(self) -> None:
+        """Lance le pré-calcul du cache en tâche de fond (dédupliqué)."""
+        if self._warm_task is not None and not self._warm_task.done():
+            logger.info("Cache warm already in progress, skipping")
+            return
+        self._warm_task = asyncio.create_task(self._run_warm_cache())
+
+    async def _run_warm_cache(self) -> None:
+        try:
+            await self.warm_cache()
+        except Exception:
+            logger.exception("Cache warming failed after sync")
+
     async def warm_cache(self) -> int:
         """Pré-calcule la réponse /search de chaque origine après une sync."""
         last_sync = await self._sync.get_last_sync_at()
@@ -216,7 +227,7 @@ class SearchService:
         if not origins:
             return 0
 
-        sem = asyncio.Semaphore(CACHE_WARM_CONCURRENCY)
+        sem = asyncio.Semaphore(self._settings.cache_warm_concurrency)
         count = 0
 
         async def warm_one(origin: str) -> None:

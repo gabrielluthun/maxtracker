@@ -17,6 +17,7 @@ class Settings:
     cors_origins: list[str]
     rate_limit_per_min: int = 10
     sync_interval_min: int = 15
+    cache_warm_concurrency: int = 1
     live_fare_check_max_trains: int = 200
     sncf_records_page_limit: int = 100
     search_result_limit: int = 5000
@@ -39,4 +40,5 @@ def get_settings() -> Settings:
         mongo_url=os.environ["MONGO_URL"],
         db_name=os.environ["DB_NAME"],
         cors_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+        cache_warm_concurrency=int(os.environ.get("CACHE_WARM_CONCURRENCY", "1")),
     )
