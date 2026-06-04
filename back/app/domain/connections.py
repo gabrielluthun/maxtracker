@@ -20,7 +20,11 @@ from app.domain.stations import (
 MIN_CONNECT_SAME_STATION = 25
 MIN_CONNECT_SAME_METROPOLIS = 50
 MAX_CONNECT_MINUTES = 6 * 60
-MAX_CONNECTIONS = 2  # 3 segments max
+MAX_CONNECTIONS = 2  # plafond de capacité du moteur (3 segments max)
+# Défaut appliqué en production : 1 correspondance (2 segments). Limiter à 1
+# garde toutes les réponses /search sous la limite Mongo de 16 Mo et réduit
+# fortement le coût de calcul. Voir doc/rapport-limite-correspondances.md.
+DEFAULT_MAX_CONNECTIONS = 1
 
 HubDateKey = tuple[str, str]  # (date ISO, hub metropolis label)
 
@@ -478,7 +482,7 @@ def compose_connected_journeys(
     hub_departure_docs: Sequence[dict],
     *,
     origin_metropolis: Optional[str] = None,
-    max_connections: int = MAX_CONNECTIONS,
+    max_connections: int = DEFAULT_MAX_CONNECTIONS,
 ) -> list[ConnectedJourney]:
     return segments_to_connected_journeys(
         [segment_from_trip_doc(d) for d in outbound_docs],
