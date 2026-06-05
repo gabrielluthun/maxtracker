@@ -116,7 +116,10 @@ class SyncService:
         )
 
         if self._search is not None:
-            self._search.schedule_warm_cache()
+            try:
+                await self._search.warm_cache()
+            except Exception:
+                logger.exception("Cache warming failed after sync")
 
         return {"status": "ok", "total": total}
 

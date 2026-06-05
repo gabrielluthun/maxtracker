@@ -57,7 +57,6 @@ class SearchService:
         # aux tâches pour éviter leur ramassage prématuré par le GC.
         self._refresh_keys: set[str] = set()
         self._refresh_tasks: set[asyncio.Task] = set()
-        self._warm_task: asyncio.Task | None = None
 
     async def search_stations(self, q: str, *, limit: int = 15) -> list[StationSuggestion]:
         q = (q or "").strip()
@@ -204,19 +203,6 @@ class SearchService:
             logger.exception("Background cache refresh failed for origin %r", origin)
         finally:
             self._refresh_keys.discard(key)
-
-    def schedule_warm_cache(self) -> None:
-        """Lance le pré-calcul du cache en tâche de fond (dédupliqué)."""
-        if self._warm_task is not None and not self._warm_task.done():
-            logger.info("Cache warm already in progress, skipping")
-            return
-        self._warm_task = asyncio.create_task(self._run_warm_cache())
-
-    async def _run_warm_cache(self) -> None:
-        try:
-            await self.warm_cache()
-        except Exception:
-            logger.exception("Cache warming failed after sync")
 
     async def warm_cache(self) -> int:
         """Pré-calcule la réponse /search de chaque origine après une sync."""
