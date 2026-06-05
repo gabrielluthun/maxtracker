@@ -37,9 +37,6 @@ from app.services.sncf.connect import build_sncf_connect_url
 
 logger = logging.getLogger("maxtracker")
 
-# Concurrence du pré-calcul de cache (nb d'origines calculées en parallèle).
-CACHE_WARM_CONCURRENCY = 8
-
 
 class SearchService:
     def __init__(
@@ -216,7 +213,7 @@ class SearchService:
         if not origins:
             return 0
 
-        sem = asyncio.Semaphore(CACHE_WARM_CONCURRENCY)
+        sem = asyncio.Semaphore(self._settings.cache_warm_concurrency)
         count = 0
 
         async def warm_one(origin: str) -> None:
