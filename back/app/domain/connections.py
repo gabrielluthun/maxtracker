@@ -1,9 +1,4 @@
-"""
-Composition de parcours avec correspondance (2 à 3 segments, max 2 correspondances).
-
-Chaque ligne open data = un segment. Les hubs sont les métropoles du référentiel
-(Paris, Lyon, Lille, …) avec fenêtres de correspondance 25 / 50 min.
-"""
+"""Composition de parcours avec correspondance (max 1 correspondance en prod)."""
 from __future__ import annotations
 
 from collections import defaultdict
@@ -20,13 +15,10 @@ from app.domain.stations import (
 MIN_CONNECT_SAME_STATION = 25
 MIN_CONNECT_SAME_METROPOLIS = 50
 MAX_CONNECT_MINUTES = 6 * 60
-MAX_CONNECTIONS = 2  # plafond de capacité du moteur (3 segments max)
-# Défaut appliqué en production : 1 correspondance (2 segments). Limiter à 1
-# garde toutes les réponses /search sous la limite Mongo de 16 Mo et réduit
-# fortement le coût de calcul. Voir doc/rapport-limite-correspondances.md.
+MAX_CONNECTIONS = 2
 DEFAULT_MAX_CONNECTIONS = 1
 
-HubDateKey = tuple[str, str]  # (date ISO, hub metropolis label)
+HubDateKey = tuple[str, str]
 
 
 @dataclass(frozen=True)
@@ -92,12 +84,10 @@ class ConnectedJourney:
 
     @property
     def fingerprint(self) -> str:
-        """Empreinte horaire + lieux (sans train_no ni segment_id open data)."""
         return journey_fingerprint(self)
 
 
 def _leg_origin_key(leg: TripSegment) -> str:
-    """Même métropole de départ → une seule clé (ex. LILLE EUROPE vs LILLE intramuros)."""
     if leg.origine_metropolis:
         return f"metro:{leg.origine_metropolis}"
     return normalize_station(leg.origine)
@@ -110,7 +100,6 @@ def _leg_destination_key(leg: TripSegment) -> str:
 
 
 def leg_fingerprint(leg: TripSegment) -> str:
-    """Créneau réservable : date, horaires, origine et destination (pas le n° de train)."""
     dep = (leg.heure_depart or "")[:5]
     arr = (leg.heure_arrivee or "")[:5]
     return (
@@ -123,7 +112,6 @@ def journey_fingerprint(journey: ConnectedJourney) -> str:
 
 
 def direct_trip_fingerprint(doc: dict) -> str:
-    """Empreinte d'un trajet direct (date, horaires, lieux — sans train_no)."""
     dep = (doc.get("heure_depart") or "")[:5]
     arr = (doc.get("heure_arrivee") or "")[:5]
     orig_metro = doc.get("origine_metropolis")
@@ -399,7 +387,6 @@ def hub_date_keys_from_outbound(
     *,
     origin_metropolis: Optional[str],
 ) -> frozenset[HubDateKey]:
-    """Paires (date, hub) pour la 1re requête Mongo."""
     segments = [segment_from_trip_doc(d) for d in outbound_docs]
     keys: set[HubDateKey] = set()
     for leg in segments:
@@ -413,7 +400,6 @@ def hub_date_keys_from_outbound(
 def hub_date_keys_from_two_leg_journeys(
     journeys: Sequence[ConnectedJourney],
 ) -> frozenset[HubDateKey]:
-    """Paires (date, hub) pour charger les départs du 2e hub (3e segment)."""
     keys: set[HubDateKey] = set()
     for j in journeys:
         if j.connection_count < 1:
@@ -422,18 +408,6 @@ def hub_date_keys_from_two_leg_journeys(
         if last.date and last.destination_metropolis and is_hub_metropolis(last.destination_metropolis):
             keys.add((last.date, last.destination_metropolis))
     return frozenset(keys)
-
-
-def connection_search_keys(
-    outbound_docs: Sequence[dict],
-    *,
-    origin_metropolis: Optional[str],
-) -> tuple[frozenset[str], frozenset[str]]:
-    """Compat tests : hubs + dates dérivés des clés (date, hub)."""
-    keys = hub_date_keys_from_outbound(outbound_docs, origin_metropolis=origin_metropolis)
-    hubs = frozenset(h for _, h in keys)
-    dates = frozenset(d for d, _ in keys)
-    return hubs, dates
 
 
 def segment_from_trip_doc(doc: dict) -> TripSegment:
@@ -460,23 +434,6 @@ def segment_from_trip_doc(doc: dict) -> TripSegment:
     )
 
 
-def segments_to_connected_journeys(
-    outbound_from_origin: Sequence[TripSegment],
-    segments_departing_hubs: Sequence[TripSegment],
-    *,
-    origin_metropolis: Optional[str] = None,
-    destination_metropolis: Optional[str] = None,
-    max_connections: int = MAX_CONNECTIONS,
-) -> list[ConnectedJourney]:
-    return find_all_connected_journeys(
-        outbound_from_origin,
-        segments_departing_hubs,
-        origin_metropolis=origin_metropolis,
-        destination_metropolis=destination_metropolis,
-        max_connections=max_connections,
-    )
-
-
 def compose_connected_journeys(
     outbound_docs: Sequence[dict],
     hub_departure_docs: Sequence[dict],
@@ -484,7 +441,7 @@ def compose_connected_journeys(
     origin_metropolis: Optional[str] = None,
     max_connections: int = DEFAULT_MAX_CONNECTIONS,
 ) -> list[ConnectedJourney]:
-    return segments_to_connected_journeys(
+    return find_all_connected_journeys(
         [segment_from_trip_doc(d) for d in outbound_docs],
         [segment_from_trip_doc(d) for d in hub_departure_docs],
         origin_metropolis=origin_metropolis,
@@ -493,7 +450,6 @@ def compose_connected_journeys(
 
 
 def merge_hub_departure_docs(*doc_lists: Sequence[dict]) -> list[dict]:
-    """Fusionne des listes de segments hub sans doublon _id."""
     seen: set[str] = set()
     out: list[dict] = []
     for docs in doc_lists:
