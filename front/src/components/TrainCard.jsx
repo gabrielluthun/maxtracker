@@ -39,7 +39,7 @@ function formatFare(fareEur) {
   return `${fareEur.toFixed(2).replace(".", ",")}€`;
 }
 
-function TrainCard({ trip }) {
+function TrainCard({ trip, label }) {
   const style = TRAIN_TYPE_STYLES[trip.train_type] || TRAIN_TYPE_STYLES.TGV_INOUI;
   const imminent = isImminent(trip.date, trip.heure_depart);
   const dayLabel = formatTripDayLabel(trip.date);
@@ -52,7 +52,13 @@ function TrainCard({ trip }) {
     >
       <div className={cn("sm:w-2 h-2 sm:h-auto", style.ribbon)} />
 
-      <div className="flex-1 p-5 grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr_auto] gap-4 sm:items-center">
+      <div className="flex-1 p-5">
+        {label && (
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
+            {label}
+          </div>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr_auto] gap-4 sm:items-center">
         <div>
           <div className="font-mono text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{fmtHHmm(trip.heure_depart)}</div>
           <div className="text-sm text-slate-600 dark:text-slate-400 mt-0.5 line-clamp-1">{trip.origine}</div>
@@ -103,6 +109,7 @@ function TrainCard({ trip }) {
             <span className="font-mono">{formatFare(fare)}</span>
             <ExternalLink className="h-4 w-4" strokeWidth={2.5} />
           </a>
+        </div>
         </div>
       </div>
     </div>

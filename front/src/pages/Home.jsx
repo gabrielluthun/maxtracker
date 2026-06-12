@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useDeferredValue, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useDeferredValue,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { toast } from "sonner";
 import { List, CalendarDays, BarChart3, Sparkles, AlertCircle, Inbox } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
@@ -10,13 +18,14 @@ import {
   filterPreparedGroups,
 } from "@/lib/tripTime";
 import DestinationGroup from "@/components/DestinationGroup";
+import DestinationGroupSkeleton from "@/components/DestinationGroupSkeleton";
 import CalendarView from "@/components/CalendarView";
 import PeakHoursChart from "@/components/PeakHoursChart";
 import Disclaimer from "@/components/Disclaimer";
 import WelcomeModal from "@/components/WelcomeModal";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { searchTrips } from "@/lib/api";
+import { useSearchTrips } from "@/hooks/useSearchTrips";
 import { getHidden, unhideDestination, hideDestination } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
@@ -35,56 +44,81 @@ const defaultFilters = {
   dateHorizonDays: DEFAULT_DATE_HORIZON_DAYS,
 };
 
-// Mobile: limiter le nombre de destinations rendues pour réduire le scroll et améliorer la perf perçue.
-// Desktop (lg+) conserve la liste complète.
 const MOBILE_INITIAL_DESTINATIONS = 10;
 const MOBILE_DESTINATIONS_STEP = 5;
 
 export default function Home({ syncInfo, registerRerunSearch }) {
   const [origin, setOrigin] = useState(null);
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [searchOrigin, setSearchOrigin] = useState(null);
   const [filters, setFilters] = useState(defaultFilters);
   const deferredFilters = useDeferredValue(filters);
+  const [isPending, startTransition] = useTransition();
   const [animateResults, setAnimateResults] = useState(false);
   const [hidden, setHidden] = useState(getHidden());
   const [tab, setTab] = useState("list");
   const [mobileVisibleDestinations, setMobileVisibleDestinations] = useState(MOBILE_INITIAL_DESTINATIONS);
 
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useSearchTrips(searchOrigin, { enabled: !!searchOrigin });
+
+  const loading = isLoading;
+  const refreshing = isFetching && !!data;
+  const uiPending = isPending || (isFetching && !data);
+
   const onFiltersChange = useCallback((next) => {
-    setAnimateResults(false);
-    setFilters(next);
+    startTransition(() => {
+      setAnimateResults(false);
+      setFilters(next);
+    });
   }, []);
 
-  const handleSearch = useCallback(async (station, freshPrices = false) => {
+  const handleSearch = useCallback((station) => {
     if (!station || !station.raw) {
       toast.error("Sélectionnez une gare valide");
       return;
     }
-    setLoading(true);
-    setData(null);
-    try {
-      const res = await searchTrips(station.raw, { freshPrices });
-      setData(res);
-      setAnimateResults(true);
-      if (res.total_trips === 0 && res.served) {
-        toast.info("Aucun train à 0€ pour le moment — réessayez plus tard.");
-      }
-    } catch (e) {
-      if (e?.response?.status === 429) toast.error("Trop de recherches. Patientez 1 minute.");
-      else if (e?.response?.status === 400) toast.error("Aucune gare valide sélectionnée");
-      else toast.error("Erreur lors de la recherche");
-    } finally {
-      setLoading(false);
-    }
+    startTransition(() => {
+      setOrigin(station);
+      setSearchOrigin(station.raw);
+      setAnimateResults(false);
+    });
   }, []);
+
+  const toastedOrigin = useRef(null);
+
+  useEffect(() => {
+    if (!isFetching && data) setAnimateResults(true);
+  }, [isFetching, data]);
+
+  useEffect(() => {
+    if (!searchOrigin || isFetching || !data) return;
+    if (toastedOrigin.current === searchOrigin) return;
+    toastedOrigin.current = searchOrigin;
+    if (data.total_trips === 0 && data.served) {
+      toast.info("Aucun train à 0€ pour le moment — réessayez plus tard.");
+    }
+  }, [searchOrigin, isFetching, data]);
+
+  useEffect(() => {
+    if (!isError) return;
+    const status = error?.response?.status;
+    if (status === 429) toast.error("Trop de recherches. Patientez 1 minute.");
+    else if (status === 400) toast.error("Aucune gare valide sélectionnée");
+    else toast.error("Erreur lors de la recherche");
+  }, [isError, error]);
 
   useEffect(() => {
     registerRerunSearch?.(() => {
-      if (origin) handleSearch(origin);
+      if (searchOrigin) refetch();
     });
     return () => registerRerunSearch?.(null);
-  }, [origin, handleSearch, registerRerunSearch]);
+  }, [searchOrigin, refetch, registerRerunSearch]);
 
   const preparedGroups = useMemo(
     () => enrichSearchGroups(data?.groups),
@@ -116,7 +150,6 @@ export default function Home({ syncInfo, registerRerunSearch }) {
   }, [filteredGroups, tab]);
 
   useEffect(() => {
-    // Si la requête change (nouvelle gare) ou si le set de résultats change, on repart du seuil initial.
     setMobileVisibleDestinations(MOBILE_INITIAL_DESTINATIONS);
   }, [data?.origin, filteredGroups.length]);
 
@@ -135,11 +168,13 @@ export default function Home({ syncInfo, registerRerunSearch }) {
   }, []);
   const onResetHidden = () => { localStorage.removeItem("mt_hidden_destinations"); setHidden([]); };
 
+  const showEmpty = !data && !loading && !searchOrigin;
+  const showResults = data && data.served && data.total_trips > 0;
+
   return (
     <>
       <WelcomeModal />
 
-      {/* Hero / Search */}
       <section className="relative">
         <div
           className="absolute inset-0 -z-10 opacity-50"
@@ -165,18 +200,20 @@ export default function Home({ syncInfo, registerRerunSearch }) {
           </div>
 
           <div className="mt-8">
-            <SearchBar origin={origin} onOriginChange={setOrigin} onSearch={handleSearch} loading={loading} />
+            <SearchBar
+              origin={origin}
+              onOriginChange={setOrigin}
+              onSearch={handleSearch}
+              loading={uiPending}
+            />
           </div>
         </div>
       </section>
 
-      {/* Results */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
         {loading && <ResultsSkeleton />}
 
-        {!loading && !data && (
-          <EmptyHero />
-        )}
+        {showEmpty && <EmptyHero />}
 
         {!loading && data && !data.served && (
           <NotServed origin={data.origin} />
@@ -186,8 +223,22 @@ export default function Home({ syncInfo, registerRerunSearch }) {
           <NoTrains origin={data.origin} />
         )}
 
-        {!loading && data && data.served && data.total_trips > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 mt-2">
+        {showResults && (
+          <div className="relative grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 mt-2">
+            {refreshing && (
+              <div
+                className="absolute inset-0 z-10 bg-white/60 backdrop-blur-[1px] rounded-2xl pointer-events-none"
+                data-testid="results-refresh-overlay"
+                aria-hidden
+              >
+                <div className="sticky top-24 p-4 space-y-4 opacity-70">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <DestinationGroupSkeleton key={i} />
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="hidden lg:block lg:col-span-3 order-2 lg:order-1">
               <FiltersPanel
                 filters={filters}
@@ -208,6 +259,9 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                     <div className="text-sm text-slate-500 mt-0.5">
                       <span className="font-mono">{totalTrips}</span> trajet{totalTrips > 1 ? "s" : ""} ·{" "}
                       <span className="font-mono">{filteredGroups.length}</span> destination{filteredGroups.length > 1 ? "s" : ""}
+                      {refreshing && (
+                        <span className="ml-2 text-[#10B981]">· Mise à jour…</span>
+                      )}
                     </div>
                   </div>
                   <TabsList className="bg-slate-100">
@@ -261,7 +315,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
           </div>
         )}
 
-        {!loading && data && data.served && data.total_trips > 0 && (
+        {showResults && (
           <MobileFiltersSheet
             filters={filters}
             onFiltersChange={onFiltersChange}
@@ -280,10 +334,14 @@ export default function Home({ syncInfo, registerRerunSearch }) {
 function ResultsSkeleton() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-2" data-testid="loading-skeleton">
-      <div className="lg:col-span-3"><Skeleton className="h-96 rounded-2xl" /></div>
+      <div className="lg:col-span-3">
+        <Skeleton className="h-96 rounded-2xl" />
+      </div>
       <div className="lg:col-span-9 space-y-4">
         <Skeleton className="h-10 w-1/3 rounded-lg" />
-        {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+        {Array.from({ length: 5 }).map((_, i) => (
+          <DestinationGroupSkeleton key={i} withTrips={i < 2} />
+        ))}
       </div>
     </div>
   );

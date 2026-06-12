@@ -24,8 +24,6 @@ class TripOut(BaseModel):
 
 
 class ConnectedTripOut(BaseModel):
-    """Parcours multi-segments (1 ou 2 correspondances, 3 trains max)."""
-
     id: str
     date: str
     heure_depart: str

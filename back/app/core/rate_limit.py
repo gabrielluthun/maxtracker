@@ -1,6 +1,10 @@
-"""In-memory rate limiting per client IP."""
+"""In-memory rate limiting per client IP (cold computes only)."""
 from collections import defaultdict
 from datetime import datetime, timezone
+
+
+class RateLimitExceeded(Exception):
+    """Raised when a client exceeds the cold-compute rate limit."""
 
 
 class RateLimiter:
@@ -17,3 +21,7 @@ class RateLimiter:
             return False
         self._store[key].append(now)
         return True
+
+    def check(self, key: str) -> None:
+        if not self.allow(key):
+            raise RateLimitExceeded()

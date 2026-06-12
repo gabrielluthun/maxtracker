@@ -1,9 +1,12 @@
 """Trip search and station autocomplete."""
 import asyncio
 import logging
+import time
 from datetime import datetime, timezone
 
 from app.config import Settings
+from app.core.memory_cache import SearchMemoryCache
+from app.core.rate_limit import RateLimiter, RateLimitExceeded
 from app.db.repositories.search_cache import SearchCacheRepository
 from app.db.repositories.sync_state import SyncStateRepository
 from app.db.repositories.trips import TripsRepository
@@ -23,7 +26,6 @@ from app.domain.stations import (
     normalize_station,
     trip_id,
 )
-from app.domain.trips import departure_passed
 from app.schemas.trips import (
     ConnectedTripOut,
     DestinationGroup,
@@ -31,7 +33,7 @@ from app.schemas.trips import (
     StationSuggestion,
     TripOut,
 )
-from app.services.connection_search import merge_connected_into_groups
+from app.services.connections import merge_connected_into_groups
 from app.services.sncf.client import SncfClient
 from app.services.sncf.connect import build_sncf_connect_url
 
@@ -46,17 +48,27 @@ class SearchService:
         sync_repo: SyncStateRepository,
         sncf: SncfClient,
         cache_repo: SearchCacheRepository,
+        rate_limiter: RateLimiter,
     ) -> None:
         self._settings = settings
         self._trips = trips_repo
         self._sync = sync_repo
         self._sncf = sncf
         self._cache = cache_repo
-        # Recalculs de cache déclenchés en arrière-plan (stale-while-revalidate).
-        # _refresh_keys : dédup par origine ; _refresh_tasks : garde une réf forte
-        # aux tâches pour éviter leur ramassage prématuré par le GC.
+        self._rate_limiter = rate_limiter
+        self._memory = SearchMemoryCache()
         self._refresh_keys: set[str] = set()
         self._refresh_tasks: set[asyncio.Task] = set()
+
+    async def hydrate_memory_from_mongo(self) -> int:
+        """Charge les métropoles en L1 depuis Mongo (arrière-plan, non bloquant)."""
+        t0 = time.perf_counter()
+        entries = await self._cache.metro_entries()
+        for entry in entries:
+            self._memory.set(entry["_id"], entry["payload"], sync_at=entry.get("sync_at"))
+        ms = (time.perf_counter() - t0) * 1000
+        logger.info("L1 cache hydrated: %d metros from Mongo (%.0fms)", len(entries), ms)
+        return len(entries)
 
     async def search_stations(self, q: str, *, limit: int = 15) -> list[StationSuggestion]:
         q = (q or "").strip()
@@ -80,6 +92,13 @@ class SearchService:
             if len(suggestions) >= limit:
                 break
         return suggestions[:limit]
+
+    def _cache_key(self, origin: str) -> str:
+        origin_clean = origin.strip()
+        origin_norm = normalize_station(origin_clean)
+        if is_metropolis_query(origin_clean, origin_norm):
+            return "metro:" + metropolis_label(origin_clean, origin_norm)
+        return "norm:" + origin_norm
 
     def _origin_metropolis(self, origin_clean: str, origin_norm: str, is_metro: bool) -> str | None:
         if is_metro:
@@ -139,53 +158,52 @@ class SearchService:
         groups_out.sort(key=lambda x: (-x.trip_count, x.destination_city))
         return groups_out
 
-    def _cache_key(self, origin: str) -> str:
-        """Clé canonique d'une origine (identique entre warming et requête)."""
-        origin_clean = origin.strip()
-        origin_norm = normalize_station(origin_clean)
-        if is_metropolis_query(origin_clean, origin_norm):
-            return "metro:" + metropolis_label(origin_clean, origin_norm)
-        return "norm:" + origin_norm
+    def _response_from_cached(self, origin: str, cached: dict) -> SearchResponse:
+        payload = {**cached["payload"], "origin": origin.strip()}
+        return SearchResponse(**payload)
 
-    async def search_trips(
-        self,
-        origin: str,
-        *,
-        fresh_prices: bool = False,
-    ) -> SearchResponse:
-        # fresh_prices = re-contrôle live SNCF : jamais servi depuis le cache.
-        if fresh_prices:
-            return await self._compute_search_response(origin, fresh_prices=True)
-
+    async def search_trips(self, origin: str, *, client_ip: str = "anon") -> SearchResponse:
+        started = time.monotonic()
         last_sync = await self._sync.get_last_sync_at()
         key = self._cache_key(origin)
-        cached = await self._cache.get(key)
 
-        # Stale-while-revalidate : si une réponse existe en cache, on la sert
-        # immédiatement, même si elle date d'une sync antérieure. Le calcul lourd
-        # (~30 s sur les grandes origines) ne doit jamais bloquer la requête.
-        if cached:
-            if last_sync is not None and cached.get("sync_at") != last_sync:
+        mem_cached = self._memory.get(key)
+        if mem_cached:
+            if last_sync is not None and mem_cached.get("sync_at") != last_sync:
                 self._schedule_refresh(origin, key)
-            payload = {**cached["payload"], "origin": origin.strip()}
-            return SearchResponse(**payload)
-
-        # Démarrage à froid : aucune entrée en cache (origine jamais réchauffée).
-        # Le calcul synchrone est ici inévitable, mais le résultat est ensuite mis
-        # en cache pour toutes les requêtes suivantes.
-        resp = await self._compute_search_response(origin, fresh_prices=False)
-        try:
-            await self._cache.set(
-                key, resp.model_dump(mode="json"), sync_at=resp.last_sync_at
+            logger.info(
+                "search L1 hit origin=%r duration=%.3fs",
+                origin,
+                time.monotonic() - started,
             )
-        except Exception:
-            # Ne jamais faire échouer la requête à cause de la mise en cache
-            # (ex. payload dépassant la limite de 16 Mo d'un document Mongo).
-            logger.exception("Cache set failed for origin %r", origin)
+            return self._response_from_cached(origin, mem_cached)
+
+        mongo_cached = await self._cache.get(key)
+        if mongo_cached:
+            self._memory.set(key, mongo_cached["payload"], sync_at=mongo_cached.get("sync_at"))
+            if last_sync is not None and mongo_cached.get("sync_at") != last_sync:
+                self._schedule_refresh(origin, key)
+            logger.info(
+                "search L2 hit origin=%r duration=%.3fs",
+                origin,
+                time.monotonic() - started,
+            )
+            return self._response_from_cached(origin, mongo_cached)
+
+        self._rate_limiter.check(client_ip)
+
+        compute_started = time.monotonic()
+        resp = await self._compute_search_response(origin)
+        logger.info(
+            "search cold compute origin=%r duration=%.2fs total=%d",
+            origin,
+            time.monotonic() - compute_started,
+            resp.total_trips,
+        )
+        await self._store_cache(key, resp)
         return resp
 
     def _schedule_refresh(self, origin: str, key: str) -> None:
-        """Planifie un recalcul de cache en tâche de fond (dédupliqué par clé)."""
         if key in self._refresh_keys:
             return
         self._refresh_keys.add(key)
@@ -195,17 +213,37 @@ class SearchService:
 
     async def _refresh_entry(self, origin: str, key: str) -> None:
         try:
-            resp = await self._compute_search_response(origin, fresh_prices=False)
-            await self._cache.set(
-                key, resp.model_dump(mode="json"), sync_at=resp.last_sync_at
+            started = time.monotonic()
+            resp = await self._compute_search_response(origin)
+            if not resp.served:
+                logger.warning(
+                    "background refresh skipped origin=%r (served=False)",
+                    origin,
+                )
+                return
+            await self._store_cache(key, resp)
+            logger.info(
+                "background refresh ok origin=%r duration=%.2fs total=%d",
+                origin,
+                time.monotonic() - started,
+                resp.total_trips,
             )
         except Exception:
-            logger.exception("Background cache refresh failed for origin %r", origin)
+            logger.exception("background refresh failed origin=%r — cache unchanged", origin)
         finally:
             self._refresh_keys.discard(key)
 
+    async def _store_cache(self, key: str, resp: SearchResponse) -> None:
+        if not resp.served:
+            return
+        payload = resp.model_dump(mode="json")
+        self._memory.set(key, payload, sync_at=resp.last_sync_at)
+        try:
+            await self._cache.set(key, payload, sync_at=resp.last_sync_at)
+        except Exception:
+            logger.exception("cache set failed key=%r", key)
+
     async def warm_cache(self) -> int:
-        """Pré-calcule la réponse /search de chaque origine après une sync."""
         last_sync = await self._sync.get_last_sync_at()
         norms = await self._trips.distinct_origines_norm()
         metros = await self._trips.distinct_origine_metropolis()
@@ -213,6 +251,7 @@ class SearchService:
         if not origins:
             return 0
 
+        self._memory.clear()
         sem = asyncio.Semaphore(self._settings.cache_warm_concurrency)
         count = 0
 
@@ -220,27 +259,21 @@ class SearchService:
             nonlocal count
             async with sem:
                 try:
-                    resp = await self._compute_search_response(origin, fresh_prices=False)
-                    await self._cache.set(
-                        self._cache_key(origin),
-                        resp.model_dump(mode="json"),
-                        sync_at=last_sync,
-                    )
+                    resp = await self._compute_search_response(origin)
+                    if not resp.served:
+                        return
+                    key = self._cache_key(origin)
+                    await self._store_cache(key, resp)
                     count += 1
                 except Exception:
-                    logger.exception("Cache warm failed for origin %r", origin)
+                    logger.exception("cache warm failed origin=%r", origin)
 
         await asyncio.gather(*(warm_one(o) for o in origins))
         removed = await self._cache.prune(keep_sync_at=last_sync)
-        logger.info("Cache warmed: %d origins, %d stale entries pruned", count, removed)
+        logger.info("cache warmed: %d origins, %d stale entries pruned", count, removed)
         return count
 
-    async def _compute_search_response(
-        self,
-        origin: str,
-        *,
-        fresh_prices: bool = False,
-    ) -> SearchResponse:
+    async def _compute_search_response(self, origin: str) -> SearchResponse:
         origin_clean = origin.strip()
         origin_norm = normalize_station(origin_clean)
         is_metro = is_metropolis_query(origin_clean, origin_norm)
@@ -253,22 +286,15 @@ class SearchService:
 
         last_sync = await self._sync.get_last_sync_at()
         raw = await self._trips.find_by_query(query, limit=self._settings.search_result_limit)
-        raw = [t for t in raw if not departure_passed(t["date"], t["heure_depart"])]
-
         price_checked_at = datetime.now(timezone.utc).isoformat()
 
-        hub_keys = hub_date_keys_from_outbound(
-            raw, origin_metropolis=origin_metropolis
-        )
+        hub_keys = hub_date_keys_from_outbound(raw, origin_metropolis=origin_metropolis)
         hub_raw: list[dict] = []
         if hub_keys:
             hub_raw = await self._trips.find_departures_from_hub_date_keys(
                 hub_keys,
                 limit=self._settings.search_result_limit,
             )
-            hub_raw = [
-                t for t in hub_raw if not departure_passed(t["date"], t["heure_depart"])
-            ]
             if raw and hub_raw:
                 preview = find_all_connected_journeys(
                     [segment_from_trip_doc(t) for t in raw],
@@ -283,26 +309,7 @@ class SearchService:
                         missing,
                         limit=self._settings.search_result_limit,
                     )
-                    hub_raw_2 = [
-                        t
-                        for t in hub_raw_2
-                        if not departure_passed(t["date"], t["heure_depart"])
-                    ]
                     hub_raw = merge_hub_departure_docs(hub_raw, hub_raw_2)
-
-        pool_for_live = raw + hub_raw
-        if pool_for_live and fresh_prices:
-            live_keys = await self._sncf.fetch_live_eligible_keys(pool_for_live)
-            raw = [
-                t
-                for t in raw
-                if trip_id(t["train_no"], t["date"], t["origine"], t["destination"]) in live_keys
-            ]
-            hub_raw = [
-                t
-                for t in hub_raw
-                if trip_id(t["train_no"], t["date"], t["origine"], t["destination"]) in live_keys
-            ]
 
         if not raw and not hub_raw:
             served = True
@@ -351,9 +358,7 @@ class SearchService:
                 price_checked_at=price_checked_at,
             )
 
-        groups_out = self._build_destination_groups(
-            grouped, price_checked_at=price_checked_at
-        )
+        groups_out = self._build_destination_groups(grouped, price_checked_at=price_checked_at)
         total = sum(g.trip_count for g in groups_out)
         return SearchResponse(
             origin=origin_clean,

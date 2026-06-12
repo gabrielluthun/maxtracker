@@ -6,16 +6,14 @@ export const API = `${BACKEND_URL}/api`;
 
 export const api = axios.create({ baseURL: API, timeout: 120000 });
 
-export async function searchStations(q, { signal } = {}) {
+export async function searchStations(q) {
   if (!q || q.length < 3) return [];
-  const { data } = await api.get(`/stations/search`, { params: { q }, signal });
+  const { data } = await api.get(`/stations/search`, { params: { q } });
   return data || [];
 }
 
-export async function searchTrips(origin, { freshPrices = false } = {}) {
-  const { data } = await api.get(`/search`, {
-    params: { origin, ...(freshPrices ? { fresh_prices: true } : {}) },
-  });
+export async function searchTrips(origin) {
+  const { data } = await api.get(`/search`, { params: { origin } });
   return data;
 }
 
