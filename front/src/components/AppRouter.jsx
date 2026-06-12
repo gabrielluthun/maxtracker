@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { toast } from "sonner";
 import AppHeader from "@/components/AppHeader";
 import SyncBadge from "@/components/SyncBadge";
@@ -6,6 +7,15 @@ import Home from "@/pages/Home";
 import About from "@/pages/About";
 import { getSyncInfo, triggerSync } from "@/lib/api";
 import { APP_VIEW, viewFromHash } from "@/lib/appView";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 export default function AppRouter() {
   const [view, setView] = useState(viewFromHash);
@@ -45,18 +55,20 @@ export default function AppRouter() {
   }, []);
 
   return (
-    <div className="min-h-screen hero-radial">
-      <AppHeader
-        activeView={view}
-        trailing={
-          <SyncBadge info={syncInfo} onRefresh={onManualSync} refreshing={refreshing} />
-        }
-      />
-      {view === APP_VIEW.ABOUT ? (
-        <About />
-      ) : (
-        <Home syncInfo={syncInfo} registerRerunSearch={registerRerunSearch} />
-      )}
-    </div>
+    <QueryClientProvider client={queryClient}>
+      <div className="min-h-screen hero-radial">
+        <AppHeader
+          activeView={view}
+          trailing={
+            <SyncBadge info={syncInfo} onRefresh={onManualSync} refreshing={refreshing} />
+          }
+        />
+        {view === APP_VIEW.ABOUT ? (
+          <About />
+        ) : (
+          <Home syncInfo={syncInfo} registerRerunSearch={registerRerunSearch} />
+        )}
+      </div>
+    </QueryClientProvider>
   );
 }
