@@ -26,7 +26,6 @@ def build_sncf_connect_url(
     origine: str = "",
     destination: str = "",
 ) -> str:
-    """Deep link SNCF Connect via /redirect ou recherche textuelle."""
     base = settings.sncf_connect_base
     origin_code = (origine_iata or "").strip()
     dest_code = (destination_iata or "").strip()
