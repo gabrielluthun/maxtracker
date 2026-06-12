@@ -14,5 +14,4 @@ async def search_stations(
     q: str = "",
     limit: int = Query(15, ge=1, le=50),
 ):
-    """Autocomplete stations from departure side (origines)."""
     return await search_service.search_stations(q, limit=limit)
