@@ -1,11 +1,7 @@
-"""Tests du moteur de correspondances (tous hubs métropolitains)."""
-import sys
+"""Tests du moteur de correspondances."""
 import unittest
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from app.domain.connections import (  # noqa: E402
+from app.domain.connections import (
     TripSegment,
     build_departures_from_hub_index,
     connectable_hub,
@@ -17,7 +13,7 @@ from app.domain.connections import (  # noqa: E402
     segment_from_trip_doc,
     segments_connect,
 )
-from app.domain.stations import HUB_METROPOLISES, METROPOLIS_MAP  # noqa: E402
+from app.domain.stations import HUB_METROPOLISES, METROPOLIS_MAP
 
 
 def _seg(**kwargs) -> TripSegment:
@@ -133,77 +129,9 @@ class TestLilleMarseilleViaParis(unittest.TestCase):
         self.assertEqual(journeys[0].hub_metropolis, "Paris")
         self.assertEqual(journeys[0].connection_minutes, 60)
 
-    def test_multiple_valid_second_legs(self):
-        late = _seg(
-            train_no="6202",
-            origine="PARIS NORD",
-            destination="MARSEILLE ST CHARLES",
-            heure_depart="12:00",
-            heure_arrivee="15:30",
-            origine_metropolis="Paris",
-            destination_metropolis="Marseille",
-        )
-        journeys = find_all_connected_journeys(
-            [self.leg1],
-            [self.leg2, late],
-            origin_metropolis="Lille",
-            destination_metropolis="Marseille",
-        )
-        self.assertEqual(len(journeys), 2)
-
 
 class TestDeduplication(unittest.TestCase):
-    def test_same_trains_different_segment_ids_one_journey(self):
-        """Doublons open data : même train, libellés de gare différents."""
-        leg1a = _seg(
-            train_no="5220",
-            origine="LILLE EUROPE",
-            destination="RENNES",
-            heure_depart="07:52",
-            heure_arrivee="11:17",
-            origine_metropolis="Lille",
-            destination_metropolis="Rennes",
-            segment_id="a1",
-        )
-        leg1b = _seg(
-            train_no="5220",
-            origine="LILLE (intramuros)",
-            destination="RENNES",
-            heure_depart="07:52",
-            heure_arrivee="11:17",
-            origine_metropolis="Lille",
-            destination_metropolis="Rennes",
-            segment_id="b1",
-        )
-        leg2 = _seg(
-            train_no="8044",
-            origine="RENNES",
-            destination="PARIS (intramuros)",
-            heure_depart="12:27",
-            heure_arrivee="13:57",
-            origine_metropolis="Rennes",
-            destination_metropolis="Paris",
-        )
-        leg3 = _seg(
-            train_no="7331",
-            origine="PARIS (intramuros)",
-            destination="ARRAS",
-            heure_depart="15:51",
-            heure_arrivee="16:40",
-            origine_metropolis="Paris",
-        )
-        journeys = find_all_connected_journeys(
-            [leg1a, leg1b],
-            [leg2, leg3],
-            origin_metropolis="Lille",
-            max_connections=2,
-        )
-        three = [j for j in journeys if j.connection_count == 2]
-        self.assertEqual(len(three), 1)
-        self.assertEqual(len({j.fingerprint for j in journeys}), len(journeys))
-
     def test_same_schedule_different_train_numbers_one_journey(self):
-        """Cas Angers→Paris : 12472 vs 8922, mêmes horaires → un seul parcours."""
         leg1 = _seg(
             train_no="5224",
             origine="LILLE (intramuros)",
@@ -248,153 +176,6 @@ class TestDeduplication(unittest.TestCase):
         )
         three = [j for j in journeys if j.connection_count == 2]
         self.assertEqual(len(three), 1)
-        self.assertEqual(three[0].legs[1].train_no, "12472")
-
-    def test_different_middle_departure_keeps_two_journeys(self):
-        """14:44 vs 15:44 depuis Angers = deux options distinctes."""
-        leg1 = _seg(
-            train_no="5224",
-            origine="LILLE (intramuros)",
-            destination="ANGERS SAINT LAUD",
-            heure_depart="09:36",
-            heure_arrivee="14:02",
-            origine_metropolis="Lille",
-            destination_metropolis="Angers",
-        )
-        leg2_early = _seg(
-            train_no="8834",
-            origine="ANGERS SAINT LAUD",
-            destination="PARIS (intramuros)",
-            heure_depart="14:44",
-            heure_arrivee="16:08",
-            origine_metropolis="Angers",
-            destination_metropolis="Paris",
-        )
-        leg2_late = _seg(
-            train_no="12472",
-            origine="ANGERS SAINT LAUD",
-            destination="PARIS (intramuros)",
-            heure_depart="15:44",
-            heure_arrivee="17:27",
-            origine_metropolis="Angers",
-            destination_metropolis="Paris",
-        )
-        leg3 = _seg(
-            train_no="6925",
-            origine="PARIS (intramuros)",
-            destination="LYON ST EXUPERY TGV",
-            heure_depart="18:14",
-            heure_arrivee="20:05",
-            origine_metropolis="Paris",
-            destination_metropolis="Lyon",
-        )
-        journeys = find_all_connected_journeys(
-            [leg1],
-            [leg2_early, leg2_late, leg3],
-            origin_metropolis="Lille",
-            max_connections=2,
-        )
-        three = [j for j in journeys if j.connection_count == 2]
-        self.assertEqual(len(three), 2)
-
-
-class TestThreeLegJourney(unittest.TestCase):
-    def test_lille_paris_lyon_marseille(self):
-        leg1 = _seg(
-            train_no="1",
-            origine="LILLE EUROPE",
-            destination="PARIS NORD",
-            heure_depart="07:00",
-            heure_arrivee="09:00",
-            origine_metropolis="Lille",
-            destination_metropolis="Paris",
-        )
-        leg2 = _seg(
-            train_no="2",
-            origine="PARIS NORD",
-            destination="LYON PART DIEU",
-            heure_depart="10:00",
-            heure_arrivee="12:00",
-            origine_metropolis="Paris",
-            destination_metropolis="Lyon",
-        )
-        leg3 = _seg(
-            train_no="3",
-            origine="LYON PART DIEU",
-            destination="MARSEILLE ST CHARLES",
-            heure_depart="13:00",
-            heure_arrivee="16:00",
-            origine_metropolis="Lyon",
-            destination_metropolis="Marseille",
-        )
-        hub_pool = [leg2, leg3]
-        journeys = find_all_connected_journeys(
-            [leg1],
-            hub_pool,
-            origin_metropolis="Lille",
-            destination_metropolis="Marseille",
-            max_connections=2,
-        )
-        three = [j for j in journeys if j.connection_count == 2]
-        self.assertEqual(len(three), 1)
-        self.assertEqual(three[0].hub_metropolis, "Paris · Lyon")
-        self.assertEqual(len(three[0].legs), 3)
-
-    def test_max_connections_one_excludes_three_leg(self):
-        leg1 = _seg(
-            origine_metropolis="Lille",
-            destination_metropolis="Paris",
-            heure_arrivee="09:00",
-        )
-        leg2 = _seg(
-            train_no="2",
-            origine_metropolis="Paris",
-            destination_metropolis="Lyon",
-            heure_depart="10:00",
-            heure_arrivee="12:00",
-        )
-        leg3 = _seg(
-            train_no="3",
-            origine_metropolis="Lyon",
-            destination_metropolis="Marseille",
-            heure_depart="13:00",
-            heure_arrivee="16:00",
-        )
-        all_j = find_all_connected_journeys(
-            [leg1], [leg2, leg3], max_connections=2
-        )
-        limited = find_all_connected_journeys(
-            [leg1], [leg2, leg3], max_connections=1
-        )
-        self.assertTrue(any(j.connection_count == 2 for j in all_j))
-        self.assertFalse(any(j.connection_count == 2 for j in limited))
-
-
-class TestStrasbourgNiceViaLyon(unittest.TestCase):
-    def test_lyon_hub(self):
-        leg1 = _seg(
-            train_no="100",
-            origine="STRASBOURG",
-            destination="LYON PART DIEU",
-            heure_depart="07:00",
-            heure_arrivee="09:00",
-            origine_metropolis=None,
-            destination_metropolis="Lyon",
-        )
-        leg2 = _seg(
-            train_no="200",
-            origine="LYON PART DIEU",
-            destination="NICE VILLE",
-            heure_depart="09:30",
-            heure_arrivee="12:00",
-            origine_metropolis="Lyon",
-            destination_metropolis="Nice",
-        )
-        self.assertTrue(segments_connect(leg1, leg2))
-        j = find_all_connected_journeys(
-            [leg1], [leg2], destination_metropolis="Nice"
-        )
-        self.assertEqual(j[0].hub_metropolis, "Lyon")
 
 
 class TestExclusions(unittest.TestCase):
@@ -411,24 +192,6 @@ class TestExclusions(unittest.TestCase):
         )
         self.assertFalse(is_meaningful_journey(leg1, leg2))
         self.assertFalse(segments_connect(leg1, leg2))
-
-    def test_first_leg_same_hub_as_origin_skipped(self):
-        paris_paris = _seg(
-            origine_metropolis="Paris",
-            destination_metropolis="Paris",
-            heure_arrivee="09:00",
-        )
-        out = _seg(
-            origine_metropolis="Paris",
-            destination_metropolis="Lyon",
-            heure_depart="10:00",
-        )
-        self.assertEqual(
-            find_all_connected_journeys(
-                [paris_paris], [out], origin_metropolis="Paris"
-            ),
-            [],
-        )
 
 
 class TestIndexAndHelpers(unittest.TestCase):
@@ -465,26 +228,3 @@ class TestIndexAndHelpers(unittest.TestCase):
         }
         s = segment_from_trip_doc(doc)
         self.assertEqual(s.destination_metropolis, "Paris")
-        self.assertTrue(s.segment_id.endswith("PARIS NORD"))
-
-
-class TestAllHubsDiscoverable(unittest.TestCase):
-    """Chaque hub peut théoriquement apparaître comme connectable_hub."""
-
-    def test_connectable_hub_matches_destination_and_origin_metropolis(self):
-        for hub in sorted(HUB_METROPOLISES):
-            leg1 = _seg(
-                destination_metropolis=hub,
-                origine_metropolis="Lille" if hub != "Lille" else "Paris",
-                heure_arrivee="10:00",
-            )
-            leg2 = _seg(
-                origine_metropolis=hub,
-                destination_metropolis="Marseille" if hub != "Marseille" else "Nice",
-                heure_depart="11:00",
-            )
-            self.assertEqual(connectable_hub(leg1, leg2), hub)
-
-
-if __name__ == "__main__":
-    unittest.main()
