@@ -1,17 +1,7 @@
-"""Composition des parcours avec correspondance pour la recherche."""
-from __future__ import annotations
-
-from typing import Optional
-
+"""Mapping des parcours avec correspondance vers les modèles API."""
 from app.domain.connections import ConnectedJourney, TripSegment
 from app.schemas.trips import ConnectedTripOut, TripOut
 from app.services.sncf.connect import build_sncf_connect_url
-
-
-def _settings_like(sncf_connect_base: str):
-    from types import SimpleNamespace
-
-    return SimpleNamespace(sncf_connect_base=sncf_connect_base)
 
 
 def trip_out_from_segment(
@@ -20,6 +10,9 @@ def trip_out_from_segment(
     sncf_connect_base: str,
     price_checked_at: str,
 ) -> TripOut:
+    from types import SimpleNamespace
+
+    settings = SimpleNamespace(sncf_connect_base=sncf_connect_base)
     return TripOut(
         id=seg.segment_id,
         train_no=seg.train_no,
@@ -35,7 +28,7 @@ def trip_out_from_segment(
         fare_eur=0.0,
         price_checked_at=price_checked_at,
         sncf_connect_url=build_sncf_connect_url(
-            _settings_like(sncf_connect_base),
+            settings,
             seg.origine_iata or "",
             seg.destination_iata or "",
             seg.date,
@@ -80,7 +73,6 @@ def connected_trip_out_from_journey(
 
 
 def destination_key_for_journey(journey: ConnectedJourney) -> str:
-    """Clé de regroupement (métropole ou gare finale)."""
     if journey.destination_metropolis:
         return journey.destination_metropolis
     return journey.legs[-1].destination
@@ -93,7 +85,6 @@ def merge_connected_into_groups(
     sncf_connect_base: str,
     price_checked_at: str,
 ) -> None:
-    """Ajoute les parcours composés aux groupes destination (mutation de grouped)."""
     for journey in journeys:
         key = destination_key_for_journey(journey)
         g = grouped.setdefault(
@@ -102,6 +93,7 @@ def merge_connected_into_groups(
                 "destinations": set(),
                 "trips": [],
                 "connected_trips": [],
+                "seen_direct": set(),
                 "seen_connected": set(),
             },
         )

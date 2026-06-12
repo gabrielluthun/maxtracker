@@ -1,1 +1,1 @@
-"""MaxTracker backend application package."""
+

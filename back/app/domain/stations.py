@@ -24,12 +24,10 @@ METROPOLIS_MAP: dict[str, str] = {
     "NANCY": "Nancy",
 }
 
-# Métropoles pouvant servir de point de correspondance (même liste que METROPOLIS_MAP).
 HUB_METROPOLISES: frozenset[str] = frozenset(METROPOLIS_MAP.values())
 
 
 def normalize_station(name: str) -> str:
-    """Normalize station name (uppercase, no accents, trimmed)."""
     if not name:
         return ""
     nfkd = unicodedata.normalize("NFKD", name)
@@ -38,7 +36,6 @@ def normalize_station(name: str) -> str:
 
 
 def metropolis_for(station_normalized: str) -> Optional[str]:
-    """Return metropolis label if the station belongs to a multi-station city."""
     if not station_normalized:
         return None
     first = station_normalized.split(" ")[0]
@@ -46,7 +43,6 @@ def metropolis_for(station_normalized: str) -> Optional[str]:
 
 
 def is_hub_metropolis(label: Optional[str]) -> bool:
-    """True si la ville peut servir de correspondance (Paris, Lyon, Lille, …)."""
     return bool(label and label in HUB_METROPOLISES)
 
 

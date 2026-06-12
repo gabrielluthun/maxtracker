@@ -9,44 +9,42 @@ import {
   groupHasDepartureToday,
 } from "@/lib/tripTime";
 
-function flattenVisibleItems(trips, connectedTrips, visibleCount) {
-  const all = [
-    ...trips.map((trip) => ({ kind: "direct", trip, sortKey: trip.departure_datetime })),
-    ...connectedTrips.map((connected) => ({
-      kind: "connected",
-      connected,
-      sortKey: connected.departure_datetime,
-    })),
-  ].sort((a, b) => String(a.sortKey).localeCompare(String(b.sortKey)));
-  const slice = all.slice(0, visibleCount);
-  const visTrips = [];
-  const visConnected = [];
-  for (const item of slice) {
-    if (item.kind === "direct") visTrips.push(item.trip);
-    else visConnected.push(item.connected);
-  }
-  return { visTrips, visConnected, total: all.length };
+function DayHeader({ date, today, itemCount }) {
+  return (
+    <div
+      className="-mx-5 sticky top-16 z-30 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-y border-slate-200 dark:border-slate-700 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-sm px-5 py-3"
+      data-testid={`day-header-${date}`}
+    >
+      <h4 className="font-semibold text-base uppercase tracking-[0.14em] text-slate-800 dark:text-slate-100">
+        {formatTripDayLabel(date)}
+      </h4>
+      {date === today && (
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[#10B981]">
+          Aujourd&apos;hui
+        </span>
+      )}
+      <span className="ml-auto text-xs text-slate-500 tabular-nums">
+        {itemCount} trajet{itemCount > 1 ? "s" : ""}
+      </span>
+    </div>
+  );
 }
 
-function DestinationGroup({ group, onHide, defaultOpen = false }) {
-  const [open, setOpen] = useState(defaultOpen);
-  const [visibleCount, setVisibleCount] = useState(10);
+function DestinationGroup({ group, onHide }) {
+  const [open, setOpen] = useState(false);
   const connected = group.connected_trips || [];
-  const { visTrips, visConnected, total } = flattenVisibleItems(
-    group.trips,
-    connected,
-    visibleCount
-  );
-  const daySections = groupDestinationItemsByDate(visTrips, visConnected);
   const today = getParisClock().today;
   const hasTodayDeparture = groupHasDepartureToday(group.trips, connected);
-  const hasMore = total > visibleCount;
+  const daySections = open ? groupDestinationItemsByDate(group.trips, connected) : [];
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden" data-testid={`destination-group-${group.destination_city}`}>
+    <div
+      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl"
+      data-testid={`destination-group-${group.destination_city}`}
+    >
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between p-5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left"
+        className="w-full flex items-center justify-between p-5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left rounded-2xl"
         data-testid={`group-toggle-${group.destination_city}`}
       >
         <div className="flex items-center gap-3 min-w-0">
@@ -55,7 +53,9 @@ function DestinationGroup({ group, onHide, defaultOpen = false }) {
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <h3 className="font-semibold text-lg text-slate-900 dark:text-slate-100 truncate">{group.destination_city}</h3>
+              <h3 className="font-semibold text-lg text-slate-900 dark:text-slate-100 truncate">
+                {group.destination_city}
+              </h3>
               {hasTodayDeparture && (
                 <span
                   className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-[#10B981]/10 text-[#10B981] border-[#10B981]/30 filter-accent-highlight"
@@ -68,20 +68,28 @@ function DestinationGroup({ group, onHide, defaultOpen = false }) {
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
               {group.destinations.length > 1 ? `${group.destinations.length} gares · ` : ""}
-              <span className="font-mono">{group.trip_count}</span> trajet{group.trip_count > 1 ? "s" : ""} à 0€
+              <span className="font-mono">{group.trip_count}</span> trajet
+              {group.trip_count > 1 ? "s" : ""} à 0€
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={(e) => { e.stopPropagation(); onHide(group.destination_city); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onHide(group.destination_city);
+            }}
             className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
             title="Masquer cette destination"
             data-testid={`hide-${group.destination_city}`}
           >
             <EyeOff className="h-4 w-4" />
           </button>
-          {open ? <ChevronUp className="h-5 w-5 text-slate-400" /> : <ChevronDown className="h-5 w-5 text-slate-400" />}
+          {open ? (
+            <ChevronUp className="h-5 w-5 text-slate-400" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-slate-400" />
+          )}
         </div>
       </button>
 
@@ -90,31 +98,20 @@ function DestinationGroup({ group, onHide, defaultOpen = false }) {
           {group.destinations.length > 1 && (
             <div className="mb-3 flex flex-wrap gap-1.5">
               {group.destinations.map((d) => (
-                <span key={d} className="text-[11px] uppercase tracking-wider font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full px-2.5 py-1">
+                <span
+                  key={d}
+                  className="text-[11px] uppercase tracking-wider font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full px-2.5 py-1"
+                >
                   {d}
                 </span>
               ))}
             </div>
           )}
+
           <div className="space-y-5">
             {daySections.map((day) => (
               <section key={day.date} data-testid={`day-section-${day.date}`}>
-                <div
-                  className="-mx-5 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-y border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-5 py-3"
-                  data-testid={`day-header-${day.date}`}
-                >
-                  <h4 className="font-semibold text-base uppercase tracking-[0.14em] text-slate-800 dark:text-slate-100">
-                    {formatTripDayLabel(day.date)}
-                  </h4>
-                  {day.date === today && (
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#10B981]">
-                      Aujourd&apos;hui
-                    </span>
-                  )}
-                  <span className="ml-auto text-xs text-slate-500 tabular-nums">
-                    {day.items.length} trajet{day.items.length > 1 ? "s" : ""}
-                  </span>
-                </div>
+                <DayHeader date={day.date} today={today} itemCount={day.items.length} />
                 <div className="space-y-3 pt-3">
                   {day.items.map((item) =>
                     item.kind === "direct" ? (
@@ -127,15 +124,6 @@ function DestinationGroup({ group, onHide, defaultOpen = false }) {
               </section>
             ))}
           </div>
-          {hasMore && (
-            <button
-              onClick={() => setVisibleCount(visibleCount + 10)}
-              className="mt-4 w-full py-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#0A2540] hover:bg-slate-50 text-sm font-semibold text-slate-700 transition-colors"
-              data-testid={`load-more-${group.destination_city}`}
-            >
-              Afficher 10 trajets de plus ({total - visibleCount} restants)
-            </button>
-          )}
         </div>
       )}
     </div>
