@@ -31,18 +31,17 @@ async def lifespan(app: FastAPI):
     sync_repo = SyncStateRepository(db.sync_state)
     search_cache_repo = SearchCacheRepository(db.search_cache)
     sncf_client = SncfClient(settings)
+    rate_limiter = RateLimiter(settings.rate_limit_per_min)
     search_service = SearchService(
-        settings, trips_repo, sync_repo, sncf_client, search_cache_repo
+        settings, trips_repo, sync_repo, sncf_client, search_cache_repo, rate_limiter
     )
     sync_service = SyncService(
         settings, trips_repo, sync_repo, sncf_client, search_service
     )
-    rate_limiter = RateLimiter(settings.rate_limit_per_min)
 
     app.state.db = db
     app.state.trips_repo = trips_repo
     app.state.sync_repo = sync_repo
-    app.state.search_cache_repo = search_cache_repo
     app.state.sncf_client = sncf_client
     app.state.sync_service = sync_service
     app.state.search_service = search_service
@@ -68,6 +67,8 @@ async def lifespan(app: FastAPI):
 
     if await trips_repo.count() == 0:
         asyncio.create_task(sync_service.sync_trips())
+
+    asyncio.create_task(search_service.hydrate_memory_from_mongo())
 
     yield
 
