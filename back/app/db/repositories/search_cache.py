@@ -3,12 +3,6 @@ from typing import Any, Optional
 
 
 class SearchCacheRepository:
-    """Stocke des réponses /search déjà calculées, indexées par clé d'origine.
-
-    La validité est liée à `sync_at` : une entrée n'est servie que si elle
-    correspond au dernier import de données (`last_sync_at`).
-    """
-
     def __init__(self, collection) -> None:
         self._col = collection
 
@@ -22,10 +16,17 @@ class SearchCacheRepository:
             upsert=True,
         )
 
+    async def metro_entries(self, *, limit: int = 32) -> list[dict[str, Any]]:
+        """Entrées métropole uniquement — petit volume, prioritaire au boot."""
+        cursor = (
+            self._col.find(
+                {"_id": {"$regex": r"^metro:"}},
+                {"_id": 1, "payload": 1, "sync_at": 1},
+            )
+            .limit(limit)
+        )
+        return await cursor.to_list(length=limit)
+
     async def prune(self, *, keep_sync_at: Optional[str]) -> int:
-        """Supprime les entrées d'une synchronisation antérieure."""
         res = await self._col.delete_many({"sync_at": {"$ne": keep_sync_at}})
         return res.deleted_count
-
-    async def clear(self) -> None:
-        await self._col.delete_many({})

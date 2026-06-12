@@ -41,10 +41,6 @@ def _is_ter_train(entity: str, train_no: str, origine: str, destination: str) ->
 def classify_train_type(
     entity: str, axe: str, origine: str, destination: str, train_no: str = ""
 ) -> Optional[str]:
-    """
-    Retourne TGV_INOUI, INTERCITES, INTERCITES_NUIT, ou None (TER / hors abonnement).
-    Les OUIGO sont regroupés sous TGV_INOUI.
-    """
     ent = (entity or "").upper()
     ax = (axe or "").strip().upper()
 
@@ -63,9 +59,3 @@ def classify_train_type(
     if ax:
         return "TGV_INOUI"
     return "INTERCITES"
-
-
-def is_eligible_subscription_train(
-    entity: str, axe: str, origine: str, destination: str, train_no: str = ""
-) -> bool:
-    return classify_train_type(entity, axe, origine, destination, train_no) is not None

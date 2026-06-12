@@ -6,6 +6,17 @@ from app.domain.stations import HUB_METROPOLISES, trip_id
 from app.domain.trips import paris_cleanup_cutoff
 
 
+def _active_departure_filter() -> dict[str, Any]:
+    """Exclut les départs déjà passés — filtre appliqué côté Mongo."""
+    today, cur_time = paris_cleanup_cutoff()
+    return {
+        "$or": [
+            {"date": {"$gt": today}},
+            {"date": today, "heure_depart": {"$gte": cur_time}},
+        ]
+    }
+
+
 class TripsRepository:
     _PROJECTION = {
         "_id": 0,
@@ -30,7 +41,6 @@ class TripsRepository:
                 await self._col.insert_many(batch, ordered=False)
 
     async def cleanup_past(self) -> int:
-        """RG4: remove trips whose departure has passed."""
         today, cur_time = paris_cleanup_cutoff()
         res1 = await self._col.delete_many({"date": {"$lt": today}})
         res2 = await self._col.delete_many({"date": today, "heure_depart": {"$lt": cur_time}})
@@ -43,29 +53,11 @@ class TripsRepository:
     async def find_by_query(
         self, query: dict[str, Any], *, limit: int = 5000
     ) -> list[dict]:
-        cursor = self._col.find(query, self._PROJECTION).sort([("departure_datetime", 1)])
+        full_query = {"$and": [query, _active_departure_filter()]}
+        cursor = self._col.find(full_query, self._PROJECTION).sort(
+            [("departure_datetime", 1)]
+        )
         return await cursor.to_list(limit)
-
-    async def find_departures_from_hubs(
-        self,
-        hubs: Iterable[str],
-        dates: Iterable[str],
-        *,
-        limit: int = 5000,
-    ) -> list[dict]:
-        """
-        Segments partant d'une métropole-hub (Paris, Lyon, …) pour les dates données.
-        Préférer find_departures_from_hub_date_keys pour limiter le volume.
-        """
-        hub_list = [h for h in hubs if h in HUB_METROPOLISES]
-        date_list = sorted({d for d in dates if d})
-        if not hub_list or not date_list:
-            return []
-        query = {
-            "origine_metropolis": {"$in": hub_list},
-            "date": {"$in": date_list},
-        }
-        return await self.find_by_query(query, limit=limit)
 
     async def find_departures_from_hub_date_keys(
         self,
@@ -74,9 +66,6 @@ class TripsRepository:
         limit: int = 8000,
         chunk_size: int = 80,
     ) -> list[dict]:
-        """
-        Segments pour des paires (date, hub) précises — évite la troncature à 5000.
-        """
         clauses: list[dict[str, Any]] = []
         for date, hub in keys:
             if date and hub in HUB_METROPOLISES:
@@ -116,7 +105,7 @@ class TripsRepository:
 
     async def search_origines(self, q_norm: str, *, limit: int) -> list[str]:
         pipeline = [
-            {"$match": {"origine_norm": {"$regex": re.escape(q_norm)}}},
+            {"$match": {"origine_norm": {"$regex": f"^{re.escape(q_norm)}"}}},
             {"$group": {"_id": "$origine"}},
             {"$limit": limit * 2},
         ]

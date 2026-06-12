@@ -22,13 +22,13 @@ class Database:
         return self._db.search_cache
 
     async def ensure_indexes(self) -> None:
-        await self.trips.create_index("origine_norm")
-        await self.trips.create_index("destination_norm")
-        await self.trips.create_index("origine_metropolis")
-        await self.trips.create_index("destination_metropolis")
-        await self.trips.create_index([("origine_metropolis", 1), ("date", 1)])
-        await self.trips.create_index("date")
-        await self.trips.create_index("departure_datetime")
+        await self.trips.create_index([("origine_norm", 1), ("departure_datetime", 1)])
+        await self.trips.create_index([("origine_metropolis", 1), ("departure_datetime", 1)])
+        await self.trips.create_index(
+            [("date", 1), ("origine_metropolis", 1), ("departure_datetime", 1)]
+        )
+        await self.trips.create_index([("date", 1), ("heure_depart", 1)])
+        await self.trips.create_index([("origine_norm", 1), ("origine", 1)])
         await self.search_cache.create_index("sync_at")
 
     async def close(self) -> None:

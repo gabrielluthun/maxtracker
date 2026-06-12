@@ -12,10 +12,8 @@ export async function searchStations(q) {
   return data || [];
 }
 
-export async function searchTrips(origin, { freshPrices = false } = {}) {
-  const { data } = await api.get(`/search`, {
-    params: { origin, ...(freshPrices ? { fresh_prices: true } : {}) },
-  });
+export async function searchTrips(origin) {
+  const { data } = await api.get(`/search`, { params: { origin } });
   return data;
 }
 
