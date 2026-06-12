@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Search, Star, X, MapPin } from "lucide-react";
 import { searchStations } from "@/lib/api";
 import { getFavorites, toggleFavorite } from "@/lib/storage";
+import { usePrefetchSearch } from "@/hooks/useSearchTrips";
 import { cn } from "@/lib/utils";
 
 export default function SearchBar({ origin, onOriginChange, onSearch, loading }) {
@@ -11,6 +12,7 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
   const [favs, setFavs] = useState(getFavorites());
   const [active, setActive] = useState(-1);
   const wrapRef = useRef(null);
+  const prefetchSearch = usePrefetchSearch();
 
   useEffect(() => { setQuery(origin?.name || ""); }, [origin]);
 
@@ -52,6 +54,10 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
   const onFav = () => {
     if (!origin) return;
     setFavs(toggleFavorite(origin));
+  };
+
+  const handlePrefetch = () => {
+    if (origin?.raw) prefetchSearch(origin.raw);
   };
 
   return (
@@ -118,6 +124,8 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
             <button
               data-testid="search-submit-btn"
               onClick={() => origin && onSearch(origin)}
+              onMouseEnter={handlePrefetch}
+              onFocus={handlePrefetch}
               disabled={!origin || loading}
               className="h-14 w-full md:w-auto px-8 rounded-xl bg-[#0A2540] hover:bg-[#173A5E] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold tracking-wide transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap"
             >
@@ -141,6 +149,8 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
               <div key={f.raw} className="group flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-900 rounded-full pl-3 pr-1 py-1 text-sm max-w-full">
                 <button
                   data-testid={`fav-pick-${f.raw}`}
+                  onMouseEnter={() => prefetchSearch(f.raw)}
+                  onFocus={() => prefetchSearch(f.raw)}
                   onClick={() => { onOriginChange(f); setQuery(f.name); onSearch(f); }}
                   className="font-medium truncate max-w-[70vw] sm:max-w-none"
                 >
