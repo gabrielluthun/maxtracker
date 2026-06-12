@@ -17,20 +17,23 @@ class Settings:
     cors_origins: list[str]
     rate_limit_per_min: int = 10
     sync_interval_min: int = 15
-    live_fare_check_max_trains: int = 200
-    sncf_records_page_limit: int = 100
+    cache_warm_concurrency: int = 8
     search_result_limit: int = 5000
 
     sncf_export_url: str = (
         "https://data.sncf.com/api/explore/v2.1/catalog/datasets/tgvmax/exports/json"
     )
-    sncf_records_url: str = (
-        "https://data.sncf.com/api/explore/v2.1/catalog/datasets/tgvmax/records"
-    )
     sncf_dataset_meta_url: str = (
         "https://data.sncf.com/api/explore/v2.1/catalog/datasets/tgvmax/"
     )
     sncf_connect_base: str = "https://www.sncf-connect.com"
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    return int(raw)
 
 
 @lru_cache
@@ -39,4 +42,7 @@ def get_settings() -> Settings:
         mongo_url=os.environ["MONGO_URL"],
         db_name=os.environ["DB_NAME"],
         cors_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+        sync_interval_min=_env_int("SYNC_INTERVAL_MIN", 15),
+        cache_warm_concurrency=_env_int("CACHE_WARM_CONCURRENCY", 8),
+        search_result_limit=_env_int("SEARCH_RESULT_LIMIT", 5000),
     )
