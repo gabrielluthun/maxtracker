@@ -15,6 +15,7 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
   const [favs, setFavs] = useState(getFavorites());
   const [active, setActive] = useState(-1);
   const wrapRef = useRef(null);
+  const cacheRef = useRef(new Map());
   const prefetchSearch = usePrefetchSearch();
 
   useEffect(() => { setQuery(origin?.name || ""); }, [origin]);
