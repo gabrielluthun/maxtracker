@@ -71,7 +71,7 @@ Ouvrez l'application web, puis :
 - Badge **« Départ possible aujourd'hui »** : au moins un départ encore possible aujourd'hui vers cette ville
 - Badge **« Imminent »** : départ dans moins de 4 heures
 - Le header affiche deux horodatages : dernière publication **SNCF** et dernière importation **MaxTracker**
-- Bouton de **sync manuelle** pour forcer un rafraîchissement des données
+- Bouton de **sync manuelle** pour forcer un rafraîchissement des données (l'import SNCF prend ~5 s ; l'icône peut encore tourner ~20 s pendant la reconstruction du cache)
 - Icône **soleil / lune** dans le header : bascule le thème clair / sombre avec un fondu progressif
 
 ---
@@ -128,13 +128,20 @@ Ce dépôt contient le code source de MaxTracker (API FastAPI + interface React)
 
 ### Démarrage local
 
-**Prérequis :** Python 3.11, Node.js 18+, MongoDB (local ou Atlas).
+**Prérequis :** Python 3.11, Node.js 18+, MongoDB.
+
+**MongoDB local fortement recommandé** pour des temps de réponse corrects (cache de recherche ~200 Mo) : une source distante ajoute une latence réseau importante sur les interactions utilisateur.
 
 ```bash
+# MongoDB (macOS, Homebrew)
+brew tap mongodb/brew
+brew install mongodb-community@8.0
+brew services start mongodb/brew/mongodb-community@8.0
+
 # Backend
 cd back
 cp .env.example .env
-# MONGO_URL, DB_NAME, CORS_ORIGINS=http://localhost:3000
+# Par défaut : MONGO_URL=mongodb://127.0.0.1:27017
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn server:app --reload --port 8000
@@ -149,7 +156,7 @@ npm start
 - App : [http://localhost:3000](http://localhost:3000)
 - OpenAPI : [http://localhost:8000/docs](http://localhost:8000/docs)
 
-Au premier lancement, une sync initiale peut prendre 1–2 min si la base est vide.
+Au premier lancement avec une base vide, une **sync SNCF automatique** s'exécute (~5 s d'import). Le bouton de sync manuelle peut rester actif **~20 s de plus** le temps du préchauffage du cache de recherche.
 
 ### Structure du dépôt
 
@@ -161,35 +168,40 @@ tgvmax-platform/
 │   ├── runtime.txt                # Version Python (Render)
 │   ├── .env.example
 │   ├── app/
-│   │   ├── main.py                # Application FastAPI
+│   │   ├── main.py                # Lifespan, scheduler, wiring
 │   │   ├── config.py
+│   │   ├── dependencies.py
 │   │   ├── api/
 │   │   │   ├── router.py
 │   │   │   └── routes/            # health, search, stations, sync
-│   │   ├── core/                  # logging, rate limiting
+│   │   ├── core/
+│   │   │   ├── logging.py
+│   │   │   ├── rate_limit.py      # limite cold compute 
+│   │   │   └── memory_cache.py    # cache L1 process-local
 │   │   ├── db/
 │   │   │   ├── mongodb.py
-│   │   │   └── repositories/      # trips, sync_state
+│   │   │   └── repositories/      # trips, sync_state, search_cache
 │   │   ├── domain/
-│   │   │   ├── connections.py     # composition parcours 2–3 segments
+│   │   │   ├── connections.py     # règles métier correspondances
 │   │   │   ├── stations.py        # métropoles / hubs
-│   │   │   └── train_classifier.py
-│   │   ├── schemas/               # modèles Pydantic
+│   │   │   ├── train_classifier.py
+│   │   │   └── trips.py
+│   │   ├── schemas/               # modèles Pydantic (API)
 │   │   └── services/
-│   │       ├── search.py          # recherche + merge connected_trips
-│   │       ├── connection_search.py
-│   │       ├── sync.py
-│   │       └── sncf/              # client Open Data + SNCF Connect
+│   │       ├── search.py          # cache L1/L2, recherche, warm cache
+│   │       ├── connections.py     # mapping domain → DTO
+│   │       ├── sync.py            # pipeline SNCF → Mongo
+│   │       └── sncf/              # client Open Data + liens Connect
 │   └── tests/
 ├── front/                         # SPA React (CRA + Craco)
 │   ├── public/
 │   ├── src/
-│   │   ├── App.js
 │   │   ├── components/
 │   │   │   ├── AppRouter.jsx      # navigation Recherche / À propos
-│   │   │   ├── ConnectedTripCard.jsx
-│   │   │   ├── FiltersPanel.jsx, TrainCard.jsx, CalendarView.jsx…
+│   │   │   ├── ConnectedTripCard.jsx, DestinationGroup.jsx…
 │   │   │   └── ui/                # composants Radix / shadcn
+│   │   ├── hooks/
+│   │   │   └── useSearchTrips.js  # React Query (search + prefetch)
 │   │   ├── pages/
 │   │   │   ├── Home.jsx
 │   │   │   └── About.jsx
@@ -197,9 +209,9 @@ tgvmax-platform/
 │   └── package.json
 ├── doc/
 │   ├── regles-de-gestion.md
-│   └── contraintes.md
-└── .github/workflows/
-    └── keep-render-awake.yml      # ping périodique du backend (Render)
+│   ├── contraintes.md
+│   └── rapport-limite-correspondances.md
+└── .github/workflows/             # PR / Issues templates
 ```
 
 ### Variables d'environnement
@@ -212,9 +224,15 @@ tgvmax-platform/
 | `DB_NAME` | Oui | Nom de la base (ex. `tgvmax`) |
 | `CORS_ORIGINS` | Oui | Origines autorisées (séparées par des virgules) |
 
-Optionnel (valeurs par défaut dans `app/config.py`) : `sync_interval_min` (15), `rate_limit_per_min` (10).
+Optionnel :
 
-**Frontend** (build) : `REACT_APP_BACKEND_URL`, l'URL du backend **sans** `/api`.
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `SYNC_INTERVAL_MIN` | `15` | Intervalle de sync automatique |
+| `CACHE_WARM_CONCURRENCY` | `8` | Parallélisme du warm cache post-sync |
+| `SEARCH_RESULT_LIMIT` | `5000` | Plafond de documents Mongo par requête recherche |
+
+**Frontend** (build) : `REACT_APP_BACKEND_URL` — URL du backend **sans** `/api`.
 
 ### API
 
@@ -223,11 +241,18 @@ Préfixe : `/api`
 | Méthode | Route | Description |
 |---------|-------|-------------|
 | `GET` | `/` | Santé |
-| `GET` | `/search?origin={gare}` | Trajets directs + `connected_trips` par destination |
-| `GET` | `/search?origin={gare}&fresh_prices=true` | Recherche + re-contrôle éligibilité SNCF Connect |
-| `GET` | `/stations/search?q={texte}` | Autocomplétion gares |
+| `GET` | `/search?origin={gare}` | Trajets directs + `connected_trips` par destination (cache L1/L2) |
+| `GET` | `/stations/search?q={texte}` | Autocomplétion gares (≥ 3 caractères) |
 | `GET` | `/sync/info` | État de la synchronisation |
-| `POST` | `/sync/trigger` | Sync manuelle (admin / cron) |
+| `POST` | `/sync/trigger` | Sync manuelle SNCF + warm cache |
+
+Comportements notables :
+
+- **Cache** : L1 mémoire (LRU) + L2 collection Mongo `search_cache` ; refresh stale en arrière-plan si les données SNCF ont changé.
+- **Rate limit** : 10 recherches « cold compute » / minute / IP (HTTP 429) ; les hits cache ne sont pas limités.
+- **Première recherche** sur une origine non cachée : calcul serveur (~15–25 s) ; les recherches suivantes sont quasi instantanées avec Mongo.
+
+Tests backend : `cd back && pytest tests/`
 
 ### Documentation technique
 
@@ -242,17 +267,21 @@ Préfixe : `/api`
 
 | Couche | Technologie |
 |--------|-------------|
-| Frontend | React 19, Tailwind CSS, Radix UI, Recharts |
+| Frontend | React 19, TanStack Query, Tailwind CSS, Radix UI, Recharts |
 | Backend | FastAPI, Uvicorn, Motor, APScheduler |
-| Base | MongoDB |
+| Base | MongoDB (`trips`, `sync_state`, `search_cache`) |
 | Source | [Open Data SNCF, jeu tgvmax](https://data.sncf.com/explore/dataset/tgvmax/) |
+
+**Déploiement :** backend et MongoDB sur un VPS ; frontend sur un hébergement statique.
 
 ```mermaid
 flowchart LR
   FE[Interface web] --> API[API MaxTracker]
-  API --> MONGO[(MongoDB)]
+  API --> L1[Cache L1 mémoire]
+  API --> L2[(search_cache Mongo)]
+  API --> TRIPS[(trips Mongo)]
   API --> SNCF[Open Data SNCF]
-  API --> COMPOSE[Composition correspondances]
+  API --> COMPOSE[domain/connections]
   FE --> SC[SNCF Connect]
 ```
 
