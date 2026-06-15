@@ -536,7 +536,7 @@ export default function About() {
             data-testid="about-github-link"
           >
             <Github className="h-5 w-5 shrink-0" aria-hidden />
-            <span>MaxTracker GitHub</span>
+            <span>GitHub</span>
             <ExternalLink className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
           </a>
           <p className="mt-4 mb-0">
