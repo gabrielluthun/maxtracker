@@ -470,8 +470,7 @@ export default function About() {
 
         <BorderBlock className="border-l-amber-500/70 dark:border-amber-600">
           <p className="m-0 text-amber-950 dark:text-amber-200">
-            <strong className={EMPHASIS}>Écarts possibles avec SNCF Connect.</strong> <br /> L&apos;application
-            officielle s&apos;appuie sur des systèmes privés (stock et tarifs en temps réel). <br /> MaxTracker
+            L&apos;application officielle s&apos;appuie sur des systèmes privés (stock et tarifs en temps réel). <br /> MaxTracker
             n&apos;utilise que le flux public : un train listé ici peut ne plus être disponible sur
             SNCF Connect, et inversement.{" "} <br />
             <strong className={EMPHASIS}>
