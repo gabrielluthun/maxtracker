@@ -27,6 +27,10 @@ class Settings:
         "https://data.sncf.com/api/explore/v2.1/catalog/datasets/tgvmax/"
     )
     sncf_connect_base: str = "https://www.sncf-connect.com"
+    sncf_gares_export_url: str = (
+        "https://ressources.data.sncf.com/api/explore/v2.1/catalog/datasets/"
+        "gares-de-voyageurs/exports/json"
+    )
 
 
 def _env_int(name: str, default: int) -> int:

@@ -44,6 +44,8 @@ function TrainCard({ trip, label }) {
   const imminent = isImminent(trip.date, trip.heure_depart);
   const dayLabel = formatTripDayLabel(trip.date);
   const fare = trip.fare_eur ?? 0;
+  const origineLabel = trip.origine_label || trip.origine;
+  const destinationLabel = trip.destination_label || trip.destination;
 
   return (
     <div
@@ -61,7 +63,7 @@ function TrainCard({ trip, label }) {
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr_auto] gap-4 sm:items-center">
         <div>
           <div className="font-mono text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{fmtHHmm(trip.heure_depart)}</div>
-          <div className="text-sm text-slate-600 dark:text-slate-400 mt-0.5 line-clamp-1">{trip.origine}</div>
+          <div className="text-sm text-slate-600 dark:text-slate-400 mt-0.5 line-clamp-1">{origineLabel}</div>
         </div>
 
         <div className="hidden sm:flex flex-col items-center justify-center px-2">
@@ -77,7 +79,7 @@ function TrainCard({ trip, label }) {
         <div className="sm:text-right">
           <div className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold mb-0.5">Arrivée</div>
           <div className="font-mono text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{fmtHHmm(trip.heure_arrivee)}</div>
-          <div className="text-sm text-slate-600 dark:text-slate-400 mt-0.5 line-clamp-1">{trip.destination}</div>
+          <div className="text-sm text-slate-600 dark:text-slate-400 mt-0.5 line-clamp-1">{destinationLabel}</div>
         </div>
 
         <div className="flex sm:flex-col items-start sm:items-end gap-2">
@@ -102,8 +104,8 @@ function TrainCard({ trip, label }) {
             href={trip.sncf_connect_url}
             target="_blank"
             rel="noopener noreferrer"
-            title={`Réserver sur SNCF Connect : ${trip.origine} → ${trip.destination}, ${dayLabel} à ${fmtHHmm(trip.heure_depart)}`}
-            aria-label={`Réserver sur SNCF Connect, ${trip.origine} vers ${trip.destination}, ${dayLabel} à ${fmtHHmm(trip.heure_depart)}`}
+            title={`Réserver sur SNCF Connect : ${origineLabel} → ${destinationLabel}, ${dayLabel} à ${fmtHHmm(trip.heure_depart)}`}
+            aria-label={`Réserver sur SNCF Connect, ${origineLabel} vers ${destinationLabel}, ${dayLabel} à ${fmtHHmm(trip.heure_depart)}`}
             className="inline-flex items-center gap-2 bg-[#10B981] hover:bg-[#059669] text-white font-bold rounded-lg px-4 py-2.5 transition-colors"
           >
             <span className="font-mono">{formatFare(fare)}</span>

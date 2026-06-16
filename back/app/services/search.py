@@ -26,6 +26,7 @@ from app.domain.stations import (
     normalize_station,
     trip_id,
 )
+from app.domain.station_labels import display_station_name
 from app.schemas.trips import (
     ConnectedTripOut,
     DestinationGroup,
@@ -112,6 +113,8 @@ class SearchService:
             date=t["date"],
             origine=t["origine"],
             destination=t["destination"],
+            origine_label=display_station_name(t["origine"], t.get("origine_iata")),
+            destination_label=display_station_name(t["destination"], t.get("destination_iata")),
             origine_iata=t.get("origine_iata"),
             destination_iata=t.get("destination_iata"),
             heure_depart=t["heure_depart"],
@@ -158,8 +161,45 @@ class SearchService:
         groups_out.sort(key=lambda x: (-x.trip_count, x.destination_city))
         return groups_out
 
+    def _enrich_trip_dict(self, trip: dict) -> dict:
+        enriched = dict(trip)
+        if not enriched.get("origine_label"):
+            enriched["origine_label"] = display_station_name(
+                enriched.get("origine", ""), enriched.get("origine_iata")
+            )
+        if not enriched.get("destination_label"):
+            enriched["destination_label"] = display_station_name(
+                enriched.get("destination", ""), enriched.get("destination_iata")
+            )
+        enriched["sncf_connect_url"] = build_sncf_connect_url(
+            self._settings,
+            enriched.get("origine_iata", ""),
+            enriched.get("destination_iata", ""),
+            enriched.get("date", ""),
+            enriched.get("heure_depart", ""),
+            enriched.get("origine", ""),
+            enriched.get("destination", ""),
+        )
+        return enriched
+
+    def _enrich_cached_payload(self, payload: dict) -> dict:
+        enriched = dict(payload)
+        groups = []
+        for group in enriched.get("groups", []):
+            g = dict(group)
+            g["trips"] = [self._enrich_trip_dict(t) for t in g.get("trips", [])]
+            connected = []
+            for journey in g.get("connected_trips", []):
+                j = dict(journey)
+                j["legs"] = [self._enrich_trip_dict(leg) for leg in j.get("legs", [])]
+                connected.append(j)
+            g["connected_trips"] = connected
+            groups.append(g)
+        enriched["groups"] = groups
+        return enriched
+
     def _response_from_cached(self, origin: str, cached: dict) -> SearchResponse:
-        payload = {**cached["payload"], "origin": origin.strip()}
+        payload = self._enrich_cached_payload({**cached["payload"], "origin": origin.strip()})
         return SearchResponse(**payload)
 
     async def search_trips(self, origin: str, *, client_ip: str = "anon") -> SearchResponse:
