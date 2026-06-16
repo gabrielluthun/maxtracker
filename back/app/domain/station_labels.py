@@ -50,11 +50,36 @@ def _title_case_station(label: str) -> str:
     return " ".join(word.capitalize() for word in label.split())
 
 
-def _gare_matches_intramuros_city(gare_name: str, intramuros_label: str) -> bool:
-    city = _normalize_ascii_upper((intramuros_label or "").split("(")[0])
-    if not city:
+def _normalize_for_match(text: str) -> str:
+    return re.sub(r"[\s\-]+", " ", _normalize_ascii_upper(text)).strip()
+
+
+def _label_for_matching(raw_label: str) -> str:
+    if _is_intramuros(raw_label):
+        return (raw_label or "").split("(")[0].strip()
+    return raw_label
+
+
+def _gare_matches_station_label(gare_name: str, raw_label: str) -> bool:
+    """Vérifie que le nom référentiel correspond au libellé SNCF (évite les faux trigrammes IATA)."""
+    match_label = _label_for_matching(raw_label)
+    norm_gare = _normalize_for_match(gare_name)
+    norm_label = _normalize_for_match(match_label)
+    if not norm_label:
         return False
-    return city in _normalize_ascii_upper(gare_name)
+    if norm_label in norm_gare or norm_gare in norm_label:
+        return True
+    tokens = [t for t in norm_label.split() if t not in ("LE", "LA", "LES", "L")]
+    if not tokens:
+        tokens = norm_label.split()
+    first = tokens[0]
+    if len(first) >= 4 and first in norm_gare:
+        return True
+    if len(tokens) >= 2:
+        pair = f"{tokens[0]} {tokens[1]}"
+        if len(pair) >= 5 and pair in norm_gare:
+            return True
+    return False
 
 
 @lru_cache(maxsize=1)
@@ -95,12 +120,8 @@ def display_station_name(label: str, transporter_code: Optional[str] = None) -> 
     if code and len(code) >= 5:
         trigramme = code[2:]
         gare_name = _load_trigramme_map().get(trigramme)
-        if gare_name:
-            if _is_intramuros(raw_label):
-                if _gare_matches_intramuros_city(gare_name, raw_label):
-                    return gare_name
-            else:
-                return gare_name
+        if gare_name and _gare_matches_station_label(gare_name, raw_label):
+            return gare_name
 
     if _is_intramuros(raw_label):
         return _intramuros_city_title(raw_label)
