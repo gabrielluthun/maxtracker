@@ -19,6 +19,7 @@ node_modules/
 # Testing
 /coverage
 /test_result.md
+/load-tests
 
 # Next.js
 /.next/

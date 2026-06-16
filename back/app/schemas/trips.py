@@ -10,6 +10,8 @@ class TripOut(BaseModel):
     date: str
     origine: str
     destination: str
+    origine_label: str = ""
+    destination_label: str = ""
     origine_iata: Optional[str] = None
     destination_iata: Optional[str] = None
     heure_depart: str

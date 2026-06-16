@@ -1,5 +1,6 @@
 """Mapping des parcours avec correspondance vers les modèles API."""
 from app.domain.connections import ConnectedJourney, TripSegment
+from app.domain.station_labels import display_station_name
 from app.schemas.trips import ConnectedTripOut, TripOut
 from app.services.sncf.connect import build_sncf_connect_url
 
@@ -19,6 +20,8 @@ def trip_out_from_segment(
         date=seg.date,
         origine=seg.origine,
         destination=seg.destination,
+        origine_label=display_station_name(seg.origine, seg.origine_iata),
+        destination_label=display_station_name(seg.destination, seg.destination_iata),
         origine_iata=seg.origine_iata,
         destination_iata=seg.destination_iata,
         heure_depart=seg.heure_depart,
