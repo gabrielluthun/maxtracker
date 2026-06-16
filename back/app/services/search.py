@@ -161,8 +161,7 @@ class SearchService:
         groups_out.sort(key=lambda x: (-x.trip_count, x.destination_city))
         return groups_out
 
-    @staticmethod
-    def _enrich_trip_dict(trip: dict) -> dict:
+    def _enrich_trip_dict(self, trip: dict) -> dict:
         enriched = dict(trip)
         if not enriched.get("origine_label"):
             enriched["origine_label"] = display_station_name(
@@ -172,6 +171,15 @@ class SearchService:
             enriched["destination_label"] = display_station_name(
                 enriched.get("destination", ""), enriched.get("destination_iata")
             )
+        enriched["sncf_connect_url"] = build_sncf_connect_url(
+            self._settings,
+            enriched.get("origine_iata", ""),
+            enriched.get("destination_iata", ""),
+            enriched.get("date", ""),
+            enriched.get("heure_depart", ""),
+            enriched.get("origine", ""),
+            enriched.get("destination", ""),
+        )
         return enriched
 
     def _enrich_cached_payload(self, payload: dict) -> dict:
