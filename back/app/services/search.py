@@ -163,14 +163,12 @@ class SearchService:
 
     def _enrich_trip_dict(self, trip: dict) -> dict:
         enriched = dict(trip)
-        if not enriched.get("origine_label"):
-            enriched["origine_label"] = display_station_name(
-                enriched.get("origine", ""), enriched.get("origine_iata")
-            )
-        if not enriched.get("destination_label"):
-            enriched["destination_label"] = display_station_name(
-                enriched.get("destination", ""), enriched.get("destination_iata")
-            )
+        enriched["origine_label"] = display_station_name(
+            enriched.get("origine", ""), enriched.get("origine_iata")
+        )
+        enriched["destination_label"] = display_station_name(
+            enriched.get("destination", ""), enriched.get("destination_iata")
+        )
         enriched["sncf_connect_url"] = build_sncf_connect_url(
             self._settings,
             enriched.get("origine_iata", ""),

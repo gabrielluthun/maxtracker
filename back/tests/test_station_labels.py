@@ -42,3 +42,21 @@ def test_paris_est_via_override():
 
 def test_paris_montparnasse_via_override():
     assert display_station_name("PARIS (intramuros)", "FRPMO") == "Paris Montparnasse"
+
+
+def test_bordeaux_st_jean_rejects_wrong_trigramme():
+    fake_map = {"BOJ": "Bonneval", "BXJ": "Bordeaux Saint-Jean"}
+    with patch("app.domain.station_labels._load_trigramme_map", return_value=fake_map):
+        assert display_station_name("BORDEAUX ST JEAN", "FRBOJ") == "Bordeaux St Jean"
+
+
+def test_angouleme_keeps_accent_when_trigramme_matches():
+    fake_map = {"ANG": "Angoulême"}
+    with patch("app.domain.station_labels._load_trigramme_map", return_value=fake_map):
+        assert display_station_name("ANGOULEME", "FRANG") == "Angoulême"
+
+
+def test_dol_de_bretagne_trigramme_match():
+    fake_map = {"DOL": "Dol-de-Bretagne"}
+    with patch("app.domain.station_labels._load_trigramme_map", return_value=fake_map):
+        assert display_station_name("DOL DE BRETAGNE", "FRDOL") == "Dol-de-Bretagne"
