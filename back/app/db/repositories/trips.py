@@ -1,9 +1,12 @@
 """MongoDB access for the trips collection."""
+import logging
 import re
-from typing import Any, Iterable
+from typing import Any, Iterable, Optional
 
 from app.domain.stations import HUB_METROPOLISES, trip_id
 from app.domain.trips import paris_cleanup_cutoff
+
+logger = logging.getLogger("maxtracker")
 
 # Index de la collection trips — recréés sur la collection de staging avant la
 # bascule, car rename(dropTarget=True) remplace aussi les index de la cible.
@@ -75,21 +78,36 @@ class TripsRepository:
         await self._col.delete_many({"date": today, "heure_depart": {"$lt": cur_time}})
 
     async def find_by_query(
-        self, query: dict[str, Any], *, limit: int = 5000
+        self, query: dict[str, Any], *, limit: Optional[int] = None
     ) -> list[dict]:
+        """Trajets à venir correspondant à `query`, triés par heure de départ.
+
+        `limit` est un garde-fou mémoire : s'il est atteint, les départs les plus
+        tardifs manquent. On le signale toujours dans les logs — une troncature
+        silencieuse a déjà fait disparaître ~11 000 correspondances.
+        """
         full_query = {"$and": [query, _active_departure_filter()]}
         cursor = self._col.find(full_query, self._PROJECTION).sort(
             [("departure_datetime", 1)]
         )
-        return await cursor.to_list(limit)
+        rows = await cursor.to_list(limit)
+        if limit is not None and len(rows) >= limit:
+            logger.warning(
+                "trips query hit limit=%d: later departures are missing from the results", limit
+            )
+        return rows
 
     async def find_departures_from_hub_date_keys(
         self,
         keys: Iterable[tuple[str, str]],
         *,
-        limit: int = 8000,
         chunk_size: int = 80,
     ) -> list[dict]:
+        """Tous les départs à venir des couples (date, hub) demandés.
+
+        Pas de plafond : le volume est borné par les clés (≤ 31 jours × hubs),
+        soit ~15 000 documents au pire (Paris).
+        """
         clauses: list[dict[str, Any]] = []
         for date, hub in keys:
             if date and hub in HUB_METROPOLISES:
@@ -101,7 +119,7 @@ class TripsRepository:
         for i in range(0, len(clauses), chunk_size):
             batch = clauses[i : i + chunk_size]
             query: dict[str, Any] = batch[0] if len(batch) == 1 else {"$or": batch}
-            rows = await self.find_by_query(query, limit=limit)
+            rows = await self.find_by_query(query)
             for row in rows:
                 sid = trip_id(
                     row.get("train_no", ""),

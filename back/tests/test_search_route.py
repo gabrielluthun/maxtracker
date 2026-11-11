@@ -113,3 +113,31 @@ async def test_rendered_response_follows_new_data():
     )
     after = json.loads(gzip.decompress(await svc.search_gzip("Paris", now=now)))
     assert before.get("last_sync_at") != after.get("last_sync_at")
+
+
+@pytest.mark.asyncio
+async def test_single_connection_search_loads_hub_departures_once():
+    """Avec 1 correspondance (production), pas de 2e requête pour un 3e train."""
+    from app.config import get_settings
+
+    leg1 = {
+        "train_no": "1", "date": "2099-01-01", "origine": "LILLE (intramuros)", "destination": "PARIS (intramuros)",
+        "heure_depart": "08:00", "heure_arrivee": "09:00", "origine_metropolis": "Lille",
+        "destination_metropolis": "Paris", "train_type": "TGV_INOUI", "departure_datetime": "2099-01-01T08:00:00",
+    }
+    leg2 = {
+        **leg1, "train_no": "2", "origine": "PARIS (intramuros)", "destination": "LYON (intramuros)",
+        "heure_depart": "10:00", "heure_arrivee": "12:00", "origine_metropolis": "Paris",
+        "destination_metropolis": "Lyon", "departure_datetime": "2099-01-01T10:00:00",
+    }
+    trips = MagicMock()
+    trips.find_by_query = AsyncMock(return_value=[leg1])
+    trips.find_departures_from_hub_date_keys = AsyncMock(return_value=[leg2])
+    sync = MagicMock()
+    sync.get_last_sync_at = AsyncMock(return_value="sync-1")
+    svc = SearchService(get_settings(), trips, sync, None, MagicMock(), RateLimiter(10))
+
+    resp = await svc._compute_search_response("Lille")
+
+    trips.find_departures_from_hub_date_keys.assert_awaited_once()
+    assert [c.hub_metropolis for g in resp.groups for c in g.connected_trips] == ["Paris"]

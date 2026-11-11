@@ -393,11 +393,10 @@ class SearchService:
         hub_keys = hub_date_keys_from_outbound(raw, origin_metropolis=origin_metropolis)
         hub_raw: list[dict] = []
         if hub_keys:
-            hub_raw = await self._trips.find_departures_from_hub_date_keys(
-                hub_keys,
-                limit=self._settings.search_result_limit,
-            )
-            if raw and hub_raw:
+            hub_raw = await self._trips.find_departures_from_hub_date_keys(hub_keys)
+            # 3e train (2 correspondances) : départs des hubs atteints par le 2e train.
+            # Inutile avec 1 correspondance (réglage de production) : ni requête ni calcul.
+            if max_connections >= 2 and raw and hub_raw:
                 preview = find_all_connected_journeys(
                     [segment_from_trip_doc(t) for t in raw],
                     [segment_from_trip_doc(t) for t in hub_raw],
@@ -407,10 +406,7 @@ class SearchService:
                 extra_keys = hub_date_keys_from_two_leg_journeys(preview)
                 missing = extra_keys - hub_keys
                 if missing:
-                    hub_raw_2 = await self._trips.find_departures_from_hub_date_keys(
-                        missing,
-                        limit=self._settings.search_result_limit,
-                    )
+                    hub_raw_2 = await self._trips.find_departures_from_hub_date_keys(missing)
                     hub_raw = merge_hub_departure_docs(hub_raw, hub_raw_2)
 
         if not raw and not hub_raw:

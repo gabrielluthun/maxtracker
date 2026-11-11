@@ -240,7 +240,7 @@ Optionnel :
 |----------|--------|-------------|
 | `SYNC_INTERVAL_MIN` | `15` | Intervalle de sync automatique |
 | `CACHE_WARM_CONCURRENCY` | `8` | Parallélisme du warm cache post-sync |
-| `SEARCH_RESULT_LIMIT` | `5000` | Plafond de documents Mongo par requête recherche |
+| `SEARCH_RESULT_LIMIT` | `20000` | Garde-fou : trajets max. au départ d'une gare (alerte dans les logs s'il est atteint) |
 | `TRUSTED_PROXY_HOPS` | `0` | Proxys de confiance devant l'API (Vercel, nginx) pour la limite par IP — voir [doc/deploiement.md](doc/deploiement.md) |
 
 **Frontend** (build) : `REACT_APP_BACKEND_URL` — URL du backend **sans** `/api` (préfixe `REACT_APP_` conservé via `envPrefix` dans `vite.config.mjs`).
