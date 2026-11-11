@@ -214,22 +214,53 @@ def candidate_connection_dates(
     return tuple(Date.fromordinal(d).isoformat() for d in range(first_day, last_day + 1))
 
 
+# Changement de gare dans une même ville : temps minimum réaliste (trajet en
+# métro, RER ou navette + marge pour rejoindre le quai). Les gares sont
+# distinguées par leur code transporteur : le flux SNCF nomme « PARIS
+# (intramuros) » aussi bien la gare du Nord que Montparnasse.
+MIN_CONNECT_BETWEEN_STATIONS_BY_CITY: dict[str, int] = {
+    "Paris": 60,  # ex. Montparnasse ↔ gare du Nord : ~30 min de métro + accès aux quais
+}
+MIN_CONNECT_STATION_PAIRS: dict[frozenset[str], int] = {
+    frozenset({"FRPNO", "FRPST"}): 30,  # Paris Nord ↔ Est : 10 min à pied
+    frozenset({"FRPLY", "FRPBE"}): 30,  # Paris Gare de Lyon ↔ Bercy : 10 min à pied
+    frozenset({"FRPLY", "FRPAZ"}): 40,  # Paris Gare de Lyon ↔ Austerlitz : 15 min
+    frozenset({"FRLLE", "FRADJ"}): 30,  # Lille Europe ↔ Flandres : 10 min à pied
+}
+MIN_CONNECT_STATION_FLOOR: dict[str, int] = {
+    "FRJDQ": 75,  # Lyon Saint-Exupéry : navette de 30 min vers Part-Dieu
+}
+
+
 def required_connection_minutes(
     leg1_destination: str,
     leg2_origine: str,
     *,
     leg1_destination_metropolis: Optional[str] = None,
     leg2_origine_metropolis: Optional[str] = None,
+    leg1_destination_iata: Optional[str] = None,
+    leg2_origine_iata: Optional[str] = None,
 ) -> Optional[int]:
-    d_norm = normalize_station(leg1_destination)
-    o_norm = normalize_station(leg2_origine)
-    if d_norm == o_norm:
+    """Attente minimale pour changer de train, ou None si le changement est impossible."""
+    code1 = (leg1_destination_iata or "").strip().upper()
+    code2 = (leg2_origine_iata or "").strip().upper()
+    if code1 and code2:
+        same_station = code1 == code2
+    else:
+        same_station = normalize_station(leg1_destination) == normalize_station(leg2_origine)
+    if same_station:
         return MIN_CONNECT_SAME_STATION
+
     m1 = leg1_destination_metropolis
     m2 = leg2_origine_metropolis
-    if m1 and m2 and m1 == m2:
-        return MIN_CONNECT_SAME_METROPOLIS
-    return None
+    if not (m1 and m2 and m1 == m2):
+        return None
+    if code1 and code2:
+        pair = MIN_CONNECT_STATION_PAIRS.get(frozenset({code1, code2}))
+        if pair is not None:
+            return pair
+    floor = max(MIN_CONNECT_STATION_FLOOR.get(code1, 0), MIN_CONNECT_STATION_FLOOR.get(code2, 0))
+    return max(MIN_CONNECT_BETWEEN_STATIONS_BY_CITY.get(m1, MIN_CONNECT_SAME_METROPOLIS), floor)
 
 
 def connectable_hub(leg1: TripSegment, leg2: TripSegment) -> Optional[str]:
@@ -276,6 +307,8 @@ def connection_wait_is_valid(
         leg2.origine,
         leg1_destination_metropolis=leg1.destination_metropolis,
         leg2_origine_metropolis=leg2.origine_metropolis,
+        leg1_destination_iata=leg1.destination_iata,
+        leg2_origine_iata=leg2.origine_iata,
     )
     if min_wait is None:
         return False

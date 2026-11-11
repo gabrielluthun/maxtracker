@@ -52,13 +52,59 @@ class TestConnectionRules(unittest.TestCase):
     def test_multi_gare_same_metropolis(self):
         self.assertEqual(
             required_connection_minutes(
-                "PARIS NORD",
-                "PARIS (intramuros)",
-                leg1_destination_metropolis="Paris",
-                leg2_origine_metropolis="Paris",
+                "MARSEILLE ST CHARLES",
+                "MARSEILLE BLANCARDE",
+                leg1_destination_metropolis="Marseille",
+                leg2_origine_metropolis="Marseille",
             ),
             50,
         )
+
+    def _paris(self, code1, code2):
+        return required_connection_minutes(
+            "PARIS (intramuros)",
+            "PARIS (intramuros)",
+            leg1_destination_metropolis="Paris",
+            leg2_origine_metropolis="Paris",
+            leg1_destination_iata=code1,
+            leg2_origine_iata=code2,
+        )
+
+    def test_paris_station_change_is_not_a_same_station_transfer(self):
+        # Même nom SNCF « PARIS (intramuros) », mais Montparnasse → gare du Nord.
+        self.assertEqual(self._paris("FRPMO", "FRPNO"), 60)
+        self.assertEqual(self._paris("FRPMO", "FRPMO"), 25)
+
+    def test_neighbouring_stations_need_less_time(self):
+        self.assertEqual(self._paris("FRPNO", "FRPST"), 30)
+        self.assertEqual(self._paris("FRPBE", "FRPLY"), 30)
+        self.assertEqual(self._paris("FRPLY", "FRPAZ"), 40)
+
+    def test_lyon_saint_exupery_needs_the_shuttle(self):
+        self.assertEqual(
+            required_connection_minutes(
+                "LYON ST EXUPERY TGV.",
+                "LYON (intramuros)",
+                leg1_destination_metropolis="Lyon",
+                leg2_origine_metropolis="Lyon",
+                leg1_destination_iata="FRJDQ",
+                leg2_origine_iata="FRLPD",
+            ),
+            75,
+        )
+
+    def test_rejects_paris_station_change_in_25_minutes(self):
+        leg1 = _seg(
+            destination="PARIS (intramuros)", destination_iata="FRPMO", heure_arrivee="17:14",
+            origine_metropolis="Bordeaux", destination_metropolis="Paris",
+        )
+        leg2 = _seg(
+            train_no="2", origine="PARIS (intramuros)", origine_iata="FRPNO", heure_depart="17:39",
+            heure_arrivee="18:40", origine_metropolis="Paris", destination_metropolis="Lille",
+        )
+        self.assertFalse(segments_connect(leg1, leg2))
+        later = _seg(**{**leg2.__dict__, "heure_depart": "18:20", "segment_id": ""})
+        self.assertTrue(segments_connect(leg1, later))
 
     def test_same_station(self):
         self.assertEqual(
