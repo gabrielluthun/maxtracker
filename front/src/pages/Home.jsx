@@ -29,7 +29,20 @@ import WelcomeModal from "@/components/WelcomeModal";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSearchTrips } from "@/hooks/useSearchTrips";
-import { clearHidden, getHidden, unhideDestination, hideDestination } from "@/lib/storage";
+import {
+  clearHidden,
+  getHidden,
+  getSavedFilters,
+  hideDestination,
+  saveFilters,
+  unhideDestination,
+} from "@/lib/storage";
+import {
+  filtersToRemember,
+  filtersWithDefaults,
+  parseSearchState,
+  serializeSearchState,
+} from "@/lib/urlState";
 import { filterGroupsByDestination } from "@/lib/destinationSearch";
 import { cn } from "@/lib/utils";
 
@@ -39,32 +52,30 @@ const PeakHoursChart = lazy(() => import("@/components/PeakHoursChart"));
 const HERO_BG = "https://static.prod-images.emergentagent.com/jobs/f74c49b6-18a0-4cb7-95f4-30d605669f9b/images/cfaaa1f6fd3ab022112caad3ff0c854d3d7487ef5ce8eb07cef5ff782c6cb730.png";
 const EMPTY_BG = "https://static.prod-images.emergentagent.com/jobs/f74c49b6-18a0-4cb7-95f4-30d605669f9b/images/a8fc6da684e5f05873d772644a95f43d0c632d9f05c9468e3746d24581b9fbec.png";
 
-const defaultFilters = {
-  departureTodayOnly: false,
-  weekendOnly: false,
-  timeSlots: { morning: true, afternoon: true, evening: true },
-  showInoui: true,
-  showIntercites: true,
-  showIntercitesNuit: true,
-  maxConnections: 0,
-  maxDurationMinutes: null,
-  dateHorizonDays: DEFAULT_DATE_HORIZON_DAYS,
-  selectedDate: null, // jour choisi dans le calendrier (YYYY-MM-DD)
-};
+/**
+ * État de recherche d'après l'URL. Un lien partagé (avec `gare`) impose ses filtres ;
+ * sans gare dans l'URL, on reprend les derniers filtres utilisés sur cet appareil.
+ */
+function searchStateFromLocation() {
+  const state = parseSearchState(window.location.search);
+  if (!state.station) state.filters = filtersWithDefaults(getSavedFilters() ?? {});
+  return state;
+}
 
 const MOBILE_INITIAL_DESTINATIONS = 10;
 const MOBILE_DESTINATIONS_STEP = 5;
 
 export default function Home({ syncInfo, registerRerunSearch }) {
-  const [origin, setOrigin] = useState(null);
-  const [searchOrigin, setSearchOrigin] = useState(null);
-  const [filters, setFilters] = useState(defaultFilters);
+  const [initial] = useState(searchStateFromLocation);
+  const [origin, setOrigin] = useState(initial.station);
+  const [searchOrigin, setSearchOrigin] = useState(initial.station?.raw ?? null);
+  const [filters, setFilters] = useState(initial.filters);
   const deferredFilters = useDeferredValue(filters);
   const [isPending, startTransition] = useTransition();
   const [animateResults, setAnimateResults] = useState(false);
   const [hidden, setHidden] = useState(getHidden());
-  const [tab, setTab] = useState("list");
-  const [destQuery, setDestQuery] = useState("");
+  const [tab, setTab] = useState(initial.tab);
+  const [destQuery, setDestQuery] = useState(initial.destQuery);
   const deferredDestQuery = useDeferredValue(destQuery);
   const [mobileVisibleDestinations, setMobileVisibleDestinations] = useState(MOBILE_INITIAL_DESTINATIONS);
 
@@ -103,6 +114,46 @@ export default function Home({ syncInfo, registerRerunSearch }) {
       setAnimateResults(false);
       setDestQuery(""); // nouvelle gare : la recherche de destination repart de zéro
     });
+  }, []);
+
+  // Derniers filtres mémorisés pour la prochaine visite (sans le jour choisi, ponctuel).
+  useEffect(() => {
+    saveFilters(filtersToRemember(filters));
+  }, [filters]);
+
+  // Recherche → URL. Nouvelle gare = nouvelle entrée d'historique (bouton « Précédent ») ;
+  // filtres, onglet et destination remplacent l'entrée courante.
+  const urlStationRef = useRef(initial.station?.raw ?? null);
+  useEffect(() => {
+    const query = serializeSearchState({
+      station: searchOrigin ? { raw: searchOrigin } : null,
+      filters,
+      destQuery: deferredDestQuery,
+      tab,
+    });
+    const { pathname, search, hash } = window.location;
+    if (query === search) return;
+    const url = `${pathname}${query}${hash}`;
+    if ((searchOrigin ?? null) !== urlStationRef.current) window.history.pushState(null, "", url);
+    else window.history.replaceState(null, "", url);
+    urlStationRef.current = searchOrigin ?? null;
+  }, [searchOrigin, filters, deferredDestQuery, tab]);
+
+  // « Précédent » / « Suivant » : l'URL redevient la source de vérité.
+  useEffect(() => {
+    const onPopState = () => {
+      const state = searchStateFromLocation();
+      urlStationRef.current = state.station?.raw ?? null;
+      startTransition(() => {
+        setOrigin(state.station);
+        setSearchOrigin(state.station?.raw ?? null);
+        setFilters(state.filters);
+        setDestQuery(state.destQuery);
+        setTab(state.tab);
+      });
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   const toastedOrigin = useRef(null);

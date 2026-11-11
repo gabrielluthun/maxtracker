@@ -6,6 +6,7 @@ const KEYS = {
   favorites: "mt_favorites",
   hidden: "mt_hidden_destinations",
   welcomeDismissed: "mt_welcome_dismissed",
+  filters: "mt_filters",
 };
 
 function readJson(key, fallback) {
@@ -84,3 +85,12 @@ export function clearHidden() {
   remove(KEYS.hidden);
 }
 
+
+/** Derniers filtres utilisés (objet partiel, fusionné ensuite avec les valeurs par défaut). */
+export function getSavedFilters() {
+  const saved = readJson(KEYS.filters, null);
+  return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : null;
+}
+export function saveFilters(filters) {
+  writeJson(KEYS.filters, filters);
+}
