@@ -244,12 +244,14 @@ Préfixe : `/api`
 | `GET` | `/search?origin={gare}` | Trajets directs + `connected_trips` par destination (cache L1/L2) |
 | `GET` | `/stations/search?q={texte}` | Autocomplétion gares (≥ 3 caractères) |
 | `GET` | `/sync/info` | État de la synchronisation |
-| `POST` | `/sync/trigger` | Sync manuelle SNCF + warm cache |
+| `POST` | `/sync/trigger` | Sync manuelle SNCF + warm cache (1 toutes les 3 min, sinon HTTP 429 + `Retry-After`) |
 
 Comportements notables :
 
 - **Cache** : L1 mémoire (LRU) + L2 collection Mongo `search_cache` ; refresh stale en arrière-plan si les données SNCF ont changé.
 - **Rate limit** : 10 recherches « cold compute » / minute / IP (HTTP 429) ; les hits cache ne sont pas limités.
+- **Compression** : réponses > 1 Ko compressées en gzip (niveau 6) — `/search` Paris passe de ~17,7 Mo à ~640 Ko.
+- **Sync** : une seule à la fois (verrou) ; la collection `trips` est remplacée de façon atomique (`trips_staging` puis `renameCollection`). Le référentiel des gares (libellés) est chargé en arrière-plan et rechargé au plus une fois par jour.
 - **Première recherche** sur une origine non cachée : calcul serveur (~15–25 s) ; les recherches suivantes sont quasi instantanées avec Mongo.
 
 Tests backend : `cd back && pytest tests/`

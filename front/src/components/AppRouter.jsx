@@ -20,6 +20,12 @@ const queryClient = new QueryClient({
 const SYNC_COOLDOWN_MS = 3 * 60 * 1000;
 const SYNC_HEARTBEAT_MS = 60 * 1000;
 
+/** Délai annoncé par le serveur (en-tête Retry-After, en secondes) après un 429. */
+function retryAfterMs(headerValue) {
+  const seconds = Number.parseInt(headerValue, 10);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : SYNC_COOLDOWN_MS;
+}
+
 function nextSyncPollDelay(info) {
   if (!info?.next_sync_at) return SYNC_HEARTBEAT_MS;
   const wait = new Date(info.next_sync_at).getTime() - Date.now();
@@ -75,14 +81,25 @@ export default function AppRouter() {
     if (refreshing || Date.now() < cooldownUntil) return;
     setRefreshing(true);
     try {
-      await triggerSync();
+      const result = await triggerSync();
       const info = await getSyncInfo();
       setSyncInfo(info);
       setCooldownUntil(Date.now() + SYNC_COOLDOWN_MS);
-      toast.success("Synchronisation effectuée");
-      rerunSearchRef.current?.();
-    } catch {
-      toast.error("Synchronisation impossible");
+      if (result?.status === "skipped" && result?.reason === "sync_in_progress") {
+        toast.info("Une synchronisation est déjà en cours");
+      } else if (result?.status === "error") {
+        toast.error("Données SNCF indisponibles — les données actuelles sont conservées");
+      } else {
+        toast.success("Synchronisation effectuée");
+        rerunSearchRef.current?.();
+      }
+    } catch (err) {
+      if (err?.response?.status === 429) {
+        setCooldownUntil(Date.now() + retryAfterMs(err.response.headers?.["retry-after"]));
+        toast.info("Une synchronisation vient d'être lancée. Réessayez un peu plus tard.");
+      } else {
+        toast.error("Synchronisation impossible");
+      }
     } finally {
       setRefreshing(false);
     }

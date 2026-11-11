@@ -1,8 +1,12 @@
 import { useMemo } from "react";
+import {
+  calendarDays,
+  getParisClock,
+  mondayFirstWeekdayIndex,
+} from "@/lib/tripTime";
 
 const WEEKDAYS = ["L", "M", "M", "J", "V", "S", "D"];
-
-function dateKey(d) { return d.toISOString().slice(0, 10); }
+const CALENDAR_DAYS = 30;
 
 export default function CalendarView({ trips }) {
   const counts = useMemo(() => {
@@ -13,23 +17,13 @@ export default function CalendarView({ trips }) {
     return map;
   }, [trips]);
 
-  const cells = useMemo(() => {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const arr = [];
-    for (let i = 0; i < 30; i++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      arr.push(d);
-    }
-    return arr;
-  }, []);
+  // Dates ISO en heure de Paris, comme `trip.date` côté SNCF : les clés des
+  // cases correspondent donc exactement aux dates des trajets.
+  const { today } = getParisClock();
+  const cells = useMemo(() => calendarDays(today, CALENDAR_DAYS), [today]);
 
   const max = Math.max(1, ...Object.values(counts));
-
-  // Pad to start with Monday alignment
-  const firstDay = cells[0].getDay();
-  const padStart = (firstDay + 6) % 7; // Monday-based
+  const padStart = mondayFirstWeekdayIndex(cells[0]);
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5" data-testid="calendar-view">
@@ -42,11 +36,10 @@ export default function CalendarView({ trips }) {
       </div>
       <div className="grid grid-cols-7 gap-2">
         {Array.from({ length: padStart }).map((_, i) => <div key={`p${i}`} />)}
-        {cells.map((d) => {
-          const k = dateKey(d);
+        {cells.map((k) => {
           const n = counts[k] || 0;
           const intensity = n === 0 ? 0 : 0.15 + (n / max) * 0.85;
-          const isToday = k === dateKey(new Date());
+          const isToday = k === today;
           return (
             <div
               key={k}
@@ -58,7 +51,7 @@ export default function CalendarView({ trips }) {
                 outline: isToday ? "2px solid #0A2540" : "none",
               }}
             >
-              <div className="text-[11px] opacity-70">{d.toLocaleDateString("fr-FR", { day: "numeric" })}</div>
+              <div className="text-[11px] opacity-70">{Number(k.slice(8, 10))}</div>
               <div className="font-mono text-sm font-semibold leading-none mt-0.5">{n || ""}</div>
             </div>
           );

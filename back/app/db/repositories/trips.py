@@ -5,6 +5,16 @@ from typing import Any, Iterable
 from app.domain.stations import HUB_METROPOLISES, trip_id
 from app.domain.trips import paris_cleanup_cutoff
 
+# Index de la collection trips — recréés sur la collection de staging avant la
+# bascule, car rename(dropTarget=True) remplace aussi les index de la cible.
+TRIPS_INDEXES: tuple[list[tuple[str, int]], ...] = (
+    [("origine_norm", 1), ("departure_datetime", 1)],
+    [("origine_metropolis", 1), ("departure_datetime", 1)],
+    [("date", 1), ("origine_metropolis", 1), ("departure_datetime", 1)],
+    [("date", 1), ("heure_depart", 1)],
+    [("origine_norm", 1), ("origine", 1)],
+)
+
 
 def _active_departure_filter() -> dict[str, Any]:
     """Exclut les départs déjà passés — filtre appliqué côté Mongo."""
@@ -34,11 +44,25 @@ class TripsRepository:
         return await self._col.count_documents({})
 
     async def replace_all(self, docs: list[dict], *, chunk_size: int = 5000) -> None:
-        await self._col.delete_many({})
+        """Remplace tout le contenu de façon atomique pour les lecteurs.
+
+        Les documents sont écrits dans `<trips>_staging`, indexés, puis la
+        collection est basculée par un seul `renameCollection` : une recherche
+        concurrente voit soit l'ancien jeu complet, soit le nouveau, jamais une
+        collection vide ou à moitié remplie.
+        """
+        if not docs:
+            await self._col.delete_many({})
+            return
+        staging = self._col.database[f"{self._col.name}_staging"]
+        await staging.drop()  # reste d'une sync interrompue
         for i in range(0, len(docs), chunk_size):
             batch = docs[i : i + chunk_size]
             if batch:
-                await self._col.insert_many(batch, ordered=False)
+                await staging.insert_many(batch, ordered=False)
+        for keys in TRIPS_INDEXES:
+            await staging.create_index(keys)
+        await staging.rename(self._col.name, dropTarget=True)
 
     async def cleanup_past(self) -> int:
         today, cur_time = paris_cleanup_cutoff()
