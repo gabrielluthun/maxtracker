@@ -1,0 +1,6 @@
+# Dépendances de développement et de test (pas installées en production).
+-r requirements.txt
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+# Client HTTP du TestClient de Starlette ≥ 1.x (httpx y est déprécié).
+httpx2>=2.16.0

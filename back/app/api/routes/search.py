@@ -2,8 +2,9 @@ import gzip
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
+from app.core.client_ip import client_ip
 from app.core.rate_limit import RateLimitExceeded
-from app.dependencies import SearchServiceDep
+from app.dependencies import SearchServiceDep, SettingsDep
 from app.schemas.trips import SearchResponse
 
 router = APIRouter(tags=["search"])
@@ -29,6 +30,7 @@ def accepts_gzip(accept_encoding: str) -> bool:
 async def search_trips(
     request: Request,
     search_service: SearchServiceDep,
+    settings: SettingsDep,
     origin: str = "",
     connections: bool = Query(
         True,
@@ -45,7 +47,7 @@ async def search_trips(
     if not origin or not origin.strip():
         raise HTTPException(status_code=400, detail="Aucune gare de départ sélectionnée")
 
-    ip = request.client.host if request.client else "anon"
+    ip = client_ip(request, trusted_hops=settings.trusted_proxy_hops)
     try:
         body = await search_service.search_gzip(
             origin.strip(), client_ip=ip, connections=connections, compact=compact

@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: back
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      MONGO_URL: mongodb://127.0.0.1:27017
+      DB_NAME: tgvmax_ci
+      # Les tests d'intégration Mongo échouent (au lieu d'être ignorés) si la base manque.
+      REQUIRE_MONGO: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11" # version de production (back/runtime.txt)
+          cache: pip
+          cache-dependency-path: back/requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+
+  frontend:
+    name: Frontend (lint, tests, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: front
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
