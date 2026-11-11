@@ -240,7 +240,7 @@ Optionnel :
 |----------|--------|-------------|
 | `SYNC_INTERVAL_MIN` | `15` | Intervalle de sync automatique |
 | `CACHE_WARM_CONCURRENCY` | `8` | Parallélisme du warm cache post-sync |
-| `SEARCH_RESULT_LIMIT` | `5000` | Plafond de documents Mongo par requête recherche |
+| `SEARCH_RESULT_LIMIT` | `20000` | Garde-fou : trajets max. au départ d'une gare (alerte dans les logs s'il est atteint) |
 | `TRUSTED_PROXY_HOPS` | `0` | Proxys de confiance devant l'API (Vercel, nginx) pour la limite par IP — voir [doc/deploiement.md](doc/deploiement.md) |
 
 **Frontend** (build) : `REACT_APP_BACKEND_URL` — URL du backend **sans** `/api` (préfixe `REACT_APP_` conservé via `envPrefix` dans `vite.config.mjs`).
@@ -254,7 +254,7 @@ Préfixe : `/api`
 | `GET` | `/` | Santé (réponse fixe) |
 | `GET` | `/health` | Supervision : MongoDB + fraîcheur des syncs (`ok` / `degraded` → 200, `down` → 503) |
 | `GET` | `/search?origin={gare}&connections=0\|1&compact=0\|1` | Trajets par destination (cache L1/L2). Par défaut : réponse complète. `connections=0` : directs seuls (+ `omitted_connected_trips`) ; `compact=1` : sans les champs recalculés côté client (lien SNCF Connect, ids…) |
-| `GET` | `/stations/search?q={texte}` | Autocomplétion gares (≥ 3 caractères) |
+| `GET` | `/stations/search?q={texte}` | Autocomplétion gares (≥ 3 caractères) : insensible aux accents, tirets et « Saint »/« St », mots n'importe où dans le nom, gares regroupées par la SNCF retrouvées par leur vrai nom (« Montparnasse » → Paris) |
 | `GET` | `/sync/info` | État de la synchronisation |
 | `POST` | `/sync/trigger` | Sync manuelle SNCF + warm cache (1 toutes les 3 min, sinon HTTP 429 + `Retry-After`) |
 

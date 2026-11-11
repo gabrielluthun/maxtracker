@@ -21,6 +21,7 @@ pip install -r requirements.txt   # production : sans les outils de test
 
 - **Python 3.11 minimum** (Starlette 1.x). Motor n'est plus utilisé : PyMongo fournit le client asynchrone.
 - Après le redémarrage : `curl -fsS https://<domaine>/api/health` doit répondre `"status": "ok"`.
+- Si la version déployée change `PIPELINE_VERSION` (`back/app/services/sync.py`), rien à faire : la vérification suivante (≤ 15 min) reconstruit trajets et cache, même sans nouvelle publication SNCF. Pour l'accélérer, lancer une sync manuelle.
 
 ## Variables d'environnement (`back/.env`)
 
@@ -31,7 +32,7 @@ pip install -r requirements.txt   # production : sans les outils de test
 | `CORS_ORIGINS` | `*` | Origines autorisées, séparées par des virgules |
 | `SYNC_INTERVAL_MIN` | `15` | Intervalle de vérification des données SNCF |
 | `CACHE_WARM_CONCURRENCY` | `8` | Origines recalculées en parallèle après une sync |
-| `SEARCH_RESULT_LIMIT` | `5000` | Plafond de documents par requête de recherche |
+| `SEARCH_RESULT_LIMIT` | `20000` | Garde-fou : trajets max. au départ d'une gare (alerte dans les logs s'il est atteint) |
 | `TRUSTED_PROXY_HOPS` | `0` | Proxys de confiance devant l'API (voir ci-dessous) |
 
 ## Régler `TRUSTED_PROXY_HOPS` (limite de requêtes par IP)

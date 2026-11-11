@@ -42,6 +42,19 @@ def metropolis_for(station_normalized: str) -> Optional[str]:
     return METROPOLIS_MAP.get(first)
 
 
+def is_same_city_trip(origine_norm: str, destination_norm: str) -> bool:
+    """Trajet sans intérêt : même gare, ou deux gares d'une même métropole.
+
+    Ex. « LYON (intramuros) → LYON (intramuros) » (Perrache ↔ Part-Dieu), qui
+    apparaissait comme une destination « Lyon » au départ de Lyon et créait de
+    fausses correspondances (Paris → Lyon Perrache → Lyon Part-Dieu).
+    """
+    if origine_norm == destination_norm:
+        return True
+    metro = metropolis_for(origine_norm)
+    return metro is not None and metro == metropolis_for(destination_norm)
+
+
 def is_hub_metropolis(label: Optional[str]) -> bool:
     return bool(label and label in HUB_METROPOLISES)
 

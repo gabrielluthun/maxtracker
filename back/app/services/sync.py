@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from app.config import Settings
 from app.db.repositories.sync_state import SyncStateRepository
 from app.db.repositories.trips import TripsRepository
-from app.domain.stations import metropolis_for, normalize_station, trip_id
+from app.domain.stations import is_same_city_trip, metropolis_for, normalize_station, trip_id
 from app.domain.train_classifier import classify_train_type
 from app.domain.trips import PARIS_TZ, paris_cleanup_cutoff
 from app.services.sncf.client import SncfClient
@@ -18,6 +18,14 @@ logger = logging.getLogger("maxtracker")
 # Une sync forcée retélécharge tout l'export SNCF et recalcule le cache de
 # toutes les origines : c'est une opération globale, limitée pour tout le monde.
 MANUAL_SYNC_COOLDOWN_SECONDS = 180
+
+# Version du traitement des données (import SNCF + calcul des recherches mises en
+# cache). À incrémenter quand une modification change les trajets retenus ou les
+# résultats : au premier passage après le déploiement, la sync reconstruit tout
+# même si la SNCF n'a rien publié de nouveau.
+#   2 : trains éligibles plus filtrés comme « TER », trajets intra-ville exclus,
+#       correspondances non tronquées.
+PIPELINE_VERSION = 2
 
 
 class SyncCooldown(Exception):
@@ -86,6 +94,7 @@ class SyncService:
             and sncf_updated is not None
             and previous_updated is not None
             and sncf_updated == previous_updated
+            and await self._sync.get_pipeline_version() == PIPELINE_VERSION
         ):
             await self._sync.update({
                 "last_sync_status": "skipped",
@@ -119,6 +128,10 @@ class SyncService:
                 continue
             if date < today_iso or date > future_iso:
                 continue
+            origine_norm = normalize_station(origine)
+            destination_norm = normalize_station(destination)
+            if is_same_city_trip(origine_norm, destination_norm):
+                continue
             tid = trip_id(train_no, date, origine, destination)
             if tid in seen:
                 continue
@@ -128,12 +141,8 @@ class SyncService:
             heure_depart = row.get("heure_depart") or "00:00"
             heure_arrivee = row.get("heure_arrivee") or "00:00"
             axe = row.get("axe") or ""
-            train_type = classify_train_type(entity, axe, origine, destination, train_no)
-            if train_type is None:
-                continue
+            train_type = classify_train_type(entity, axe)
 
-            origine_norm = normalize_station(origine)
-            destination_norm = normalize_station(destination)
             docs.append({
                 "_id": tid,
                 "train_no": train_no,
@@ -172,6 +181,7 @@ class SyncService:
             "sncf_data_updated_at": sncf_updated,
             "total_trips": total,
             "last_error": None,
+            "pipeline_version": PIPELINE_VERSION,
         })
         logger.info(
             "Sync done. Total trips: %d (duration %.1fs)",

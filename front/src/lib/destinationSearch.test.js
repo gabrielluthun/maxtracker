@@ -41,3 +41,21 @@ describe("filterGroupsByDestination", () => {
     ]);
   });
 });
+
+describe("station names of grouped destinations", () => {
+  const lyon = {
+    destination_city: "Lyon",
+    destinations: ["LYON (intramuros)"],
+    trips: [{ destination_label: "Lyon Part-Dieu" }],
+    connected_trips: [{ legs: [{ destination_label: "Dijon Ville" }, { destination_label: "Lyon Perrache" }] }],
+  };
+
+  it("finds a group by the real arrival station name", () => {
+    expect(groupMatchesDestination(lyon, "part-dieu")).toBe(true);
+    expect(groupMatchesDestination(lyon, "Perrache")).toBe(true);
+  });
+
+  it("ignores intermediate stations of connections", () => {
+    expect(groupMatchesDestination(lyon, "dijon")).toBe(false);
+  });
+});

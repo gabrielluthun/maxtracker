@@ -1,6 +1,6 @@
 # Sync SNCF → Mongo → warm cache
 
-Toutes les 15 min, on lit d’abord `sncf_data_updated_at`. Si inchangé : **rien** (pas d’export, pas de warm). `POST /api/sync/trigger` force toujours un rebuild.
+Toutes les 15 min, on lit d’abord `sncf_data_updated_at`. Si inchangé **et** si les données ont été traitées par la version actuelle du code (`PIPELINE_VERSION`) : **rien** (pas d’export, pas de warm). `POST /api/sync/trigger` force toujours un rebuild.
 
 Une seule sync tourne à la fois : une sync demandée pendant qu’une autre tourne renvoie `{"status": "skipped", "reason": "sync_in_progress"}`. La sync manuelle est limitée à **1 toutes les 3 min pour tout le monde** (au-delà : HTTP 429 + `Retry-After`).
 
@@ -15,7 +15,7 @@ flowchart TD
   T[cron 15 min ou POST /sync/trigger] --> LK{sync déjà en cours ?}
   LK -->|oui| BZ[skipped — sync_in_progress]
   LK -->|non| A[metadata SNCF]
-  A --> S{timestamp inchangé<br/>et pas force ?}
+  A --> S{timestamp inchangé,<br/>même PIPELINE_VERSION<br/>et pas force ?}
   S -->|oui| SK[skip — trips et cache inchangés]
   S -->|non| B[fetch export SNCF]
   B --> C{données OK ?}
