@@ -12,8 +12,15 @@ export async function searchStations(q) {
   return data || [];
 }
 
-export async function searchTrips(origin) {
-  const { data } = await api.get(`/search`, { params: { origin } });
+/**
+ * Trajets au départ d'une gare.
+ * - `connections: false` (défaut) : directs seuls, ~6× plus léger ;
+ * - `compact: 1` : sans les champs recalculés côté client (lien SNCF Connect, ids…).
+ */
+export async function searchTrips(origin, { connections = false } = {}) {
+  const { data } = await api.get(`/search`, {
+    params: { origin, connections: connections ? 1 : 0, compact: 1 },
+  });
   return data;
 }
 

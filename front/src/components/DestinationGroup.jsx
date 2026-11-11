@@ -8,6 +8,7 @@ import {
   groupDestinationItemsByDate,
   groupHasDepartureToday,
 } from "@/lib/tripTime";
+import { journeyKey, tripKey } from "@/lib/tripKeys";
 
 function DayHeader({ date, today, itemCount }) {
   return (
@@ -115,9 +116,9 @@ function DestinationGroup({ group, onHide }) {
                 <div className="space-y-3 pt-3">
                   {day.items.map((item) =>
                     item.kind === "direct" ? (
-                      <TrainCard key={item.trip.id} trip={item.trip} />
+                      <TrainCard key={tripKey(item.trip)} trip={item.trip} />
                     ) : (
-                      <ConnectedTripCard key={item.connected.id} connected={item.connected} />
+                      <ConnectedTripCard key={journeyKey(item.connected)} connected={item.connected} />
                     )
                   )}
                 </div>

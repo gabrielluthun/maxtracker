@@ -1,6 +1,7 @@
-import { memo, useState } from "react";
+import { memo, useId, useState } from "react";
 import { ArrowRight, ChevronDown, ChevronUp, GitBranch, Zap } from "lucide-react";
 import TrainCard from "@/components/TrainCard";
+import { journeyKey, tripKey } from "@/lib/tripKeys";
 import { cn } from "@/lib/utils";
 
 const LEG_LABELS = ["1er train", "2e train", "3e train"];
@@ -21,6 +22,9 @@ function isImminent(date, heure) {
 
 function ConnectedTripCard({ connected, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
+  // Identifiant DOM valide (l'ancien id de parcours contenait espaces et « > »).
+  const legsId = useId();
+  const key = journeyKey(connected);
   const imminent = isImminent(connected.date, connected.heure_depart);
   const waitH = Math.floor(connected.connection_minutes / 60);
   const waitM = connected.connection_minutes % 60;
@@ -31,19 +35,19 @@ function ConnectedTripCard({ connected, defaultOpen = false }) {
 
   return (
     <div
-      data-testid={`connected-trip-${connected.id}`}
+      data-testid={`connected-trip-${key}`}
       className="card-hover bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden border-l-4 border-l-[#6366F1] dark:border-l-indigo-400"
     >
       <button
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        aria-controls={`connected-trip-legs-${connected.id}`}
+        aria-controls={legsId}
         className={cn(
           "w-full p-5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors",
           open && "border-b border-slate-100 dark:border-slate-700"
         )}
-        data-testid={`connected-trip-toggle-${connected.id}`}
+        data-testid={`connected-trip-toggle-${key}`}
       >
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <span
@@ -97,10 +101,10 @@ function ConnectedTripCard({ connected, defaultOpen = false }) {
         </div>
       </button>
       {open && (
-        <div id={`connected-trip-legs-${connected.id}`} className="p-5 space-y-3">
+        <div id={legsId} className="p-5 space-y-3">
           {(connected.legs || []).map((leg, i) => (
             <TrainCard
-              key={leg.id || i}
+              key={tripKey(leg) || i}
               trip={leg}
               label={LEG_LABELS[i] || `${i + 1}e train`}
             />

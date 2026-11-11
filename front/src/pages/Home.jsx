@@ -58,14 +58,18 @@ export default function Home({ syncInfo, registerRerunSearch }) {
   const [tab, setTab] = useState("list");
   const [mobileVisibleDestinations, setMobileVisibleDestinations] = useState(MOBILE_INITIAL_DESTINATIONS);
 
+  // Les correspondances (~85 % du volume) ne sont chargées que si le filtre les affiche.
+  const wantConnections = filters.maxConnections > 0;
   const {
     data,
     isLoading,
     isFetching,
+    isPlaceholderData,
     isError,
     error,
     refetch,
-  } = useSearchTrips(searchOrigin, { enabled: !!searchOrigin });
+  } = useSearchTrips(searchOrigin, { enabled: !!searchOrigin, connections: wantConnections });
+  const loadingConnections = wantConnections && isPlaceholderData && isFetching;
 
   const loading = isLoading;
   const refreshing = isFetching && !!data;
@@ -100,7 +104,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
     if (!searchOrigin || isFetching || !data) return;
     if (toastedOrigin.current === searchOrigin) return;
     toastedOrigin.current = searchOrigin;
-    if (data.total_trips === 0 && data.served) {
+    if (data.total_trips === 0 && data.served && !data.omitted_connected_trips) {
       toast.info("Aucun train à 0€ pour le moment — réessayez plus tard.");
     }
   }, [searchOrigin, isFetching, data]);
@@ -220,7 +224,11 @@ export default function Home({ syncInfo, registerRerunSearch }) {
         )}
 
         {!loading && data && data.served && data.total_trips === 0 && (
-          <NoTrains origin={data.origin} />
+          <NoTrains
+            origin={data.origin}
+            omittedConnections={data.omitted_connected_trips || 0}
+            onShowConnections={() => onFiltersChange({ ...filters, maxConnections: 1 })}
+          />
         )}
 
         {showResults && (
@@ -260,7 +268,9 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                       <span className="font-mono">{totalTrips}</span> trajet{totalTrips > 1 ? "s" : ""} ·{" "}
                       <span className="font-mono">{filteredGroups.length}</span> destination{filteredGroups.length > 1 ? "s" : ""}
                       {refreshing && (
-                        <span className="ml-2 text-[#10B981]">· Mise à jour…</span>
+                        <span className="ml-2 text-[#10B981]">
+                          · {loadingConnections ? "Chargement des correspondances…" : "Mise à jour…"}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -385,7 +395,29 @@ function NotServed({ origin }) {
   );
 }
 
-function NoTrains({ origin }) {
+function NoTrains({ origin, omittedConnections = 0, onShowConnections }) {
+  if (omittedConnections > 0) {
+    return (
+      <div className="mt-8 bg-white border border-slate-200 rounded-2xl p-10 text-center" data-testid="no-direct-trains-msg">
+        <div className="inline-flex h-16 w-16 rounded-2xl bg-slate-100 items-center justify-center mb-4">
+          <Inbox className="h-8 w-8 text-slate-400" />
+        </div>
+        <h3 className="text-2xl font-bold text-[#0A2540] mb-2">Aucun trajet direct à 0€</h3>
+        <p className="text-slate-600 max-w-md mx-auto">
+          Pas de train direct au départ de <strong>« {origin} »</strong> pour le moment, mais{" "}
+          <strong>{omittedConnections.toLocaleString("fr-FR")}</strong> parcours avec correspondance sont disponibles.
+        </p>
+        <button
+          type="button"
+          onClick={onShowConnections}
+          className="mt-5 h-11 px-6 rounded-xl bg-[#0A2540] hover:bg-[#173A5E] text-white font-semibold transition-colors"
+          data-testid="show-connections-btn"
+        >
+          Voir les trajets avec 1 correspondance
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="mt-8 bg-white border border-slate-200 rounded-2xl p-10 text-center" data-testid="no-trains-msg">
       <div className="inline-flex h-16 w-16 rounded-2xl bg-slate-100 items-center justify-center mb-4">
