@@ -1,6 +1,8 @@
 """SNCF → MongoDB sync pipeline."""
 import asyncio
 import logging
+import math
+import time
 from datetime import datetime, timedelta, timezone
 
 from app.config import Settings
@@ -13,6 +15,18 @@ from app.services.sncf.client import SncfClient
 
 logger = logging.getLogger("maxtracker")
 
+# Une sync forcée retélécharge tout l'export SNCF et recalcule le cache de
+# toutes les origines : c'est une opération globale, limitée pour tout le monde.
+MANUAL_SYNC_COOLDOWN_SECONDS = 180
+
+
+class SyncCooldown(Exception):
+    """Une sync manuelle a été lancée trop récemment."""
+
+    def __init__(self, retry_after_seconds: int) -> None:
+        super().__init__(f"retry after {retry_after_seconds}s")
+        self.retry_after_seconds = retry_after_seconds
+
 
 class SyncService:
     def __init__(
@@ -22,6 +36,9 @@ class SyncService:
         sync_repo: SyncStateRepository,
         sncf: SncfClient,
         search_service=None,
+        *,
+        manual_cooldown_seconds: int = MANUAL_SYNC_COOLDOWN_SECONDS,
+        clock=time.monotonic,
     ) -> None:
         self._settings = settings
         self._trips = trips_repo
@@ -30,8 +47,35 @@ class SyncService:
         self._search = search_service
         self._warm_task: asyncio.Task | None = None
         self._warm_generation = 0
+        self._lock = asyncio.Lock()
+        self._manual_cooldown_seconds = manual_cooldown_seconds
+        self._clock = clock
+        self._last_manual_at: float | None = None
+
+    def manual_sync_retry_after(self) -> int:
+        """Secondes restantes avant d'accepter une nouvelle sync manuelle (0 = possible)."""
+        if self._last_manual_at is None:
+            return 0
+        remaining = self._manual_cooldown_seconds - (self._clock() - self._last_manual_at)
+        return max(0, math.ceil(remaining))
+
+    async def trigger_manual_sync(self) -> dict:
+        """Sync forcée déclenchée par un utilisateur ; lève SyncCooldown si trop récente."""
+        retry_after = self.manual_sync_retry_after()
+        if retry_after > 0:
+            raise SyncCooldown(retry_after)
+        self._last_manual_at = self._clock()
+        return await self.sync_trips(force=True)
 
     async def sync_trips(self, *, force: bool = False) -> dict:
+        # Pas d'await entre le test et l'acquisition : pas de course possible.
+        if self._lock.locked():
+            logger.info("SNCF sync already running — skip (force=%s)", force)
+            return {"status": "skipped", "reason": "sync_in_progress"}
+        async with self._lock:
+            return await self._sync_trips_locked(force=force)
+
+    async def _sync_trips_locked(self, *, force: bool) -> dict:
         started = datetime.now(timezone.utc)
         logger.info("Starting SNCF sync at %s force=%s", started.isoformat(), force)
 

@@ -92,6 +92,8 @@ def create_app() -> FastAPI:
         allow_origins=settings.cors_origins,
         allow_methods=["*"],
         allow_headers=["*"],
+        # Lisible par le front en cross-origin (dev local) après un 429.
+        expose_headers=["Retry-After"],
     )
     app.add_middleware(
         GZipMiddleware,
