@@ -219,7 +219,9 @@ tgvmax-platform/
 │   ├── regles-de-gestion.md
 │   ├── contraintes.md
 │   └── rapport-limite-correspondances.md
-└── .github/workflows/             # PR / Issues templates
+└── .github/
+    ├── workflows/ci.yml           # CI : tests backend (+ MongoDB), lint/tests/build frontend
+    └── ISSUE_TEMPLATE/, PULL_REQUEST_TEMPLATE.md
 ```
 
 ### Variables d'environnement
@@ -239,6 +241,7 @@ Optionnel :
 | `SYNC_INTERVAL_MIN` | `15` | Intervalle de sync automatique |
 | `CACHE_WARM_CONCURRENCY` | `8` | Parallélisme du warm cache post-sync |
 | `SEARCH_RESULT_LIMIT` | `5000` | Plafond de documents Mongo par requête recherche |
+| `TRUSTED_PROXY_HOPS` | `0` | Proxys de confiance devant l'API (Vercel, nginx) pour la limite par IP — voir [doc/deploiement.md](doc/deploiement.md) |
 
 **Frontend** (build) : `REACT_APP_BACKEND_URL` — URL du backend **sans** `/api` (préfixe `REACT_APP_` conservé via `envPrefix` dans `vite.config.mjs`).
 
@@ -248,7 +251,8 @@ Préfixe : `/api`
 
 | Méthode | Route | Description |
 |---------|-------|-------------|
-| `GET` | `/` | Santé |
+| `GET` | `/` | Santé (réponse fixe) |
+| `GET` | `/health` | Supervision : MongoDB + fraîcheur des syncs (`ok` / `degraded` → 200, `down` → 503) |
 | `GET` | `/search?origin={gare}&connections=0\|1&compact=0\|1` | Trajets par destination (cache L1/L2). Par défaut : réponse complète. `connections=0` : directs seuls (+ `omitted_connected_trips`) ; `compact=1` : sans les champs recalculés côté client (lien SNCF Connect, ids…) |
 | `GET` | `/stations/search?q={texte}` | Autocomplétion gares (≥ 3 caractères) |
 | `GET` | `/sync/info` | État de la synchronisation |
@@ -272,6 +276,7 @@ Tests backend : `cd back && pytest tests/` · Tests et lint frontend : `cd front
 | [doc/regles-de-gestion.md](doc/regles-de-gestion.md) | Règles de gestion |
 | [doc/contraintes.md](doc/contraintes.md) | Contraintes données, métier, légales |
 | [doc/rapport-limite-correspondances.md](doc/rapport-limite-correspondances.md) | Limitation à 1 correspondance (taille cache MongoDB) |
+| [doc/deploiement.md](doc/deploiement.md) | Mise à jour du VPS, variables, proxys, HTTPS, supervision, CI |
 | [front/src/pages/About.jsx](front/src/pages/About.jsx) | Page À propos (parcours, filtres, sync) |
 
 ### Stack
@@ -283,7 +288,7 @@ Tests backend : `cd back && pytest tests/` · Tests et lint frontend : `cd front
 | Base | MongoDB (`trips`, `sync_state`, `search_cache`) |
 | Source | [Open Data SNCF, jeu tgvmax](https://data.sncf.com/explore/dataset/tgvmax/) |
 
-**Déploiement :** backend et MongoDB sur un VPS ; frontend sur un hébergement statique.
+**Déploiement :** backend et MongoDB sur un VPS ; frontend sur Vercel — détails dans [doc/deploiement.md](doc/deploiement.md).
 
 ```mermaid
 flowchart LR
