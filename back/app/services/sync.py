@@ -4,10 +4,12 @@ import logging
 import math
 import time
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 from app.config import Settings
 from app.db.repositories.sync_state import SyncStateRepository
 from app.db.repositories.trips import TripsRepository
+from app.domain.freshness import first_seen_for, is_new_trip, publication_changed
 from app.domain.stations import is_same_city_trip, metropolis_for, normalize_station, trip_id
 from app.domain.train_classifier import classify_train_type
 from app.domain.trips import PARIS_TZ, paris_cleanup_cutoff
@@ -25,7 +27,8 @@ MANUAL_SYNC_COOLDOWN_SECONDS = 180
 # même si la SNCF n'a rien publié de nouveau.
 #   2 : trains éligibles plus filtrés comme « TER », trajets intra-ville exclus,
 #       correspondances non tronquées.
-PIPELINE_VERSION = 2
+#   3 : date d'apparition des trajets et badge « nouveau ».
+PIPELINE_VERSION = 3
 
 
 class SyncCooldown(Exception):
@@ -166,6 +169,7 @@ class SyncService:
                 "synced_at": started.isoformat(),
             })
 
+        await self._stamp_freshness(docs, previous_publication=previous_updated, current_publication=sncf_updated)
         await self._trips.replace_all(docs)
         today, cur_time = paris_cleanup_cutoff()
         await self._trips.cleanup_today_before(cur_time)
@@ -191,6 +195,32 @@ class SyncService:
 
         self._schedule_warm_cache()
         return {"status": "ok", "total": total}
+
+    async def _stamp_freshness(
+        self,
+        docs: list[dict],
+        *,
+        previous_publication: Optional[str],
+        current_publication: Optional[str],
+    ) -> None:
+        """Date d'apparition (`first_seen`) et badge « nouveau » (`is_new`) de chaque trajet."""
+        previous = await self._trips.first_seen_by_id()
+        changed = publication_changed(
+            previous_publication, current_publication, previous_trip_count=len(previous)
+        )
+        new_count = 0
+        for doc in docs:
+            seen = first_seen_for(
+                doc["_id"], previous, changed=changed, current_publication=current_publication
+            )
+            doc["first_seen"] = seen
+            doc["is_new"] = is_new_trip(seen, current_publication)
+            new_count += doc["is_new"]
+        logger.info(
+            "freshness: %d new trips in the last 24 h of publications (publication changed: %s)",
+            new_count,
+            changed,
+        )
 
     def _schedule_warm_cache(self) -> None:
         if self._search is None:

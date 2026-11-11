@@ -66,6 +66,11 @@ class TripsRepository:
             await staging.create_index(keys)
         await staging.rename(self._col.name, dropTarget=True)
 
+    async def first_seen_by_id(self) -> dict[str, Optional[str]]:
+        """Date d'apparition connue de chaque trajet en base (avant remplacement)."""
+        cursor = self._col.find({}, {"first_seen": 1})
+        return {d["_id"]: d.get("first_seen") for d in await cursor.to_list(None)}
+
     async def cleanup_past(self) -> int:
         today, cur_time = paris_cleanup_cutoff()
         res1 = await self._col.delete_many({"date": {"$lt": today}})
