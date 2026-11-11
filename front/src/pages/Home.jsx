@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useDeferredValue,
@@ -20,7 +22,6 @@ import {
 import DestinationGroup from "@/components/DestinationGroup";
 import DestinationGroupSkeleton from "@/components/DestinationGroupSkeleton";
 import CalendarView from "@/components/CalendarView";
-import PeakHoursChart from "@/components/PeakHoursChart";
 import Disclaimer from "@/components/Disclaimer";
 import WelcomeModal from "@/components/WelcomeModal";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -28,6 +29,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSearchTrips } from "@/hooks/useSearchTrips";
 import { getHidden, unhideDestination, hideDestination } from "@/lib/storage";
 import { cn } from "@/lib/utils";
+
+// Recharts (~la moitié du JavaScript de l'app) n'est chargé qu'à l'ouverture de l'onglet.
+const PeakHoursChart = lazy(() => import("@/components/PeakHoursChart"));
 
 const HERO_BG = "https://static.prod-images.emergentagent.com/jobs/f74c49b6-18a0-4cb7-95f4-30d605669f9b/images/cfaaa1f6fd3ab022112caad3ff0c854d3d7487ef5ce8eb07cef5ff782c6cb730.png";
 const EMPTY_BG = "https://static.prod-images.emergentagent.com/jobs/f74c49b6-18a0-4cb7-95f4-30d605669f9b/images/a8fc6da684e5f05873d772644a95f43d0c632d9f05c9468e3746d24581b9fbec.png";
@@ -318,7 +322,11 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                 </TabsContent>
 
                 <TabsContent value="chart">
-                  {tab === "chart" && <PeakHoursChart trips={allFilteredTrips} />}
+                  {tab === "chart" && (
+                    <Suspense fallback={<Skeleton className="h-80 rounded-2xl" />}>
+                      <PeakHoursChart trips={allFilteredTrips} />
+                    </Suspense>
+                  )}
                 </TabsContent>
               </Tabs>
             </div>

@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { toast } from "sonner";
 import AppHeader from "@/components/AppHeader";
 import SyncBadge from "@/components/SyncBadge";
 import Home from "@/pages/Home";
-import About from "@/pages/About";
 import { getSyncInfo, triggerSync } from "@/lib/api";
 import { APP_VIEW, viewFromHash } from "@/lib/appView";
+
+const About = lazy(() => import("@/pages/About"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -124,7 +125,9 @@ export default function AppRouter() {
           }
         />
         {view === APP_VIEW.ABOUT ? (
-          <About />
+          <Suspense fallback={<div className="min-h-[60vh]" aria-busy="true" />}>
+            <About />
+          </Suspense>
         ) : (
           <Home syncInfo={syncInfo} registerRerunSearch={registerRerunSearch} />
         )}
