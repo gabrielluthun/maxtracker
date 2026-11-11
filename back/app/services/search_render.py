@@ -29,17 +29,26 @@ ConnectUrlBuilder = Callable[[dict[str, Any]], str]
 
 
 def strip_connections(payload: dict[str, Any]) -> dict[str, Any]:
-    """Retire les parcours avec correspondance (les groupes sans direct disparaissent ensuite)."""
+    """Retire les parcours avec correspondance et les groupes qui n'avaient qu'eux.
+
+    `omitted_connected_trips` indique combien ont été retirés : le client peut
+    proposer « voir avec correspondance » au lieu d'annoncer « aucun train ».
+    """
+    groups = payload.get("groups", [])
     out = dict(payload)
+    out["omitted_connected_trips"] = sum(len(g.get("connected_trips", [])) for g in groups)
     out["groups"] = [
         {
             **g,
             "connected_trips": [],
+            "trip_count": len(g["trips"]),
             # Gares atteintes en direct uniquement (sinon « 3 gares » pour 1 seule visible).
-            "destinations": sorted({t.get("destination", "") for t in g.get("trips", [])} - {""}),
+            "destinations": sorted({t.get("destination", "") for t in g["trips"]} - {""}),
         }
-        for g in payload.get("groups", [])
+        for g in groups
+        if g.get("trips")
     ]
+    out["total_trips"] = sum(g["trip_count"] for g in out["groups"])
     return out
 
 
@@ -94,9 +103,10 @@ def render_search_payload(
 ) -> dict[str, Any]:
     """Payload en cache (allégé) → réponse /search prête à sérialiser."""
     out: dict[str, Any] = {"served": True, **payload, "origin": origin}
+    out = filter_departed_from_payload(out, now=now)
     if not connections:
-        out = strip_connections(out)
-    out = sort_groups(filter_departed_from_payload(out, now=now))
+        out = strip_connections(out)  # après le filtre : ne compte que les parcours à venir
+    out = sort_groups(out)
     groups = []
     for group in out["groups"]:
         g = dict(group)

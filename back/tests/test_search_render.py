@@ -133,6 +133,19 @@ def test_without_connections_keeps_direct_trips_only():
     assert lyon["destinations"] == ["LYON PART DIEU"]
     assert lyon["trip_count"] == 1
     assert out["total_trips"] == 3
+    assert out["omitted_connected_trips"] == 3
+
+
+def test_omitted_count_ignores_departed_connections():
+    late = datetime(2026, 11, 12, 12, 45, tzinfo=PARIS_TZ)  # 11:00 et 12:30 sont partis
+    out = render_search_payload(
+        _payload(), origin="Paris", connect_url=_url, now=late, connections=False
+    )
+    assert out["omitted_connected_trips"] == 1
+
+
+def test_full_response_has_no_omitted_count():
+    assert "omitted_connected_trips" not in _render()
 
 
 def test_compact_drops_recomputable_fields():
