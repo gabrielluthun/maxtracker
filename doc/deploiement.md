@@ -21,6 +21,7 @@ pip install -r requirements.txt   # production : sans les outils de test
 
 - **Python 3.11 minimum** (Starlette 1.x). Motor n'est plus utilisé : PyMongo fournit le client asynchrone.
 - Après le redémarrage : `curl -fsS https://<domaine>/api/health` doit répondre `"status": "ok"`.
+- Si la version déployée change `PIPELINE_VERSION` (`back/app/services/sync.py`), rien à faire : la vérification suivante (≤ 15 min) reconstruit trajets et cache, même sans nouvelle publication SNCF. Pour l'accélérer, lancer une sync manuelle.
 
 ## Variables d'environnement (`back/.env`)
 

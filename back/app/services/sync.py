@@ -19,6 +19,14 @@ logger = logging.getLogger("maxtracker")
 # toutes les origines : c'est une opération globale, limitée pour tout le monde.
 MANUAL_SYNC_COOLDOWN_SECONDS = 180
 
+# Version du traitement des données (import SNCF + calcul des recherches mises en
+# cache). À incrémenter quand une modification change les trajets retenus ou les
+# résultats : au premier passage après le déploiement, la sync reconstruit tout
+# même si la SNCF n'a rien publié de nouveau.
+#   2 : trains éligibles plus filtrés comme « TER », trajets intra-ville exclus,
+#       correspondances non tronquées.
+PIPELINE_VERSION = 2
+
 
 class SyncCooldown(Exception):
     """Une sync manuelle a été lancée trop récemment."""
@@ -86,6 +94,7 @@ class SyncService:
             and sncf_updated is not None
             and previous_updated is not None
             and sncf_updated == previous_updated
+            and await self._sync.get_pipeline_version() == PIPELINE_VERSION
         ):
             await self._sync.update({
                 "last_sync_status": "skipped",
@@ -172,6 +181,7 @@ class SyncService:
             "sncf_data_updated_at": sncf_updated,
             "total_trips": total,
             "last_error": None,
+            "pipeline_version": PIPELINE_VERSION,
         })
         logger.info(
             "Sync done. Total trips: %d (duration %.1fs)",
