@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 
 from app.api.router import api_router
 from app.config import get_settings
@@ -19,6 +20,11 @@ from app.services.sncf.client import SncfClient
 from app.services.sync import SyncService
 
 logger = setup_logging()
+
+# Niveau 6 : ~28× plus léger sur /search Paris (17,7 Mo → 638 Ko) pour ~75 ms CPU,
+# contre ~135 ms au niveau 9 (défaut Starlette) pour seulement 8 % de gain.
+GZIP_MIN_SIZE_BYTES = 1024
+GZIP_COMPRESS_LEVEL = 6
 
 
 @asynccontextmanager
@@ -86,6 +92,11 @@ def create_app() -> FastAPI:
         allow_origins=settings.cors_origins,
         allow_methods=["*"],
         allow_headers=["*"],
+    )
+    app.add_middleware(
+        GZipMiddleware,
+        minimum_size=GZIP_MIN_SIZE_BYTES,
+        compresslevel=GZIP_COMPRESS_LEVEL,
     )
     return app
 
