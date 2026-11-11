@@ -5,15 +5,20 @@ from app.db.repositories.trips import TripsRepository
 
 
 @pytest.mark.asyncio
-async def test_station_suggestions_are_sorted_and_stable(trips_col):
-    names = ["LYON ST EXUPERY TGV.", "LYON (intramuros)", "LYON PART DIEU", "LILLE EUROPE"]
-    await trips_col.insert_many(
-        [{"_id": f"t{i}", "origine": n, "origine_norm": n.upper()} for i, n in enumerate(names * 3)]
-    )
-    repo = TripsRepository(trips_col)
-    results = [await repo.search_origines("LYON", limit=15) for _ in range(5)]
-    assert results[0] == ["LYON (intramuros)", "LYON PART DIEU", "LYON ST EXUPERY TGV."]
-    assert all(r == results[0] for r in results)
+async def test_origin_codes_lists_each_station_code_once(trips_col):
+    docs = [
+        {"_id": "1", "origine": "PARIS (intramuros)", "origine_iata": "FRPMO"},
+        {"_id": "2", "origine": "PARIS (intramuros)", "origine_iata": "FRPMO"},
+        {"_id": "3", "origine": "PARIS (intramuros)", "origine_iata": "FRPLY"},
+        {"_id": "4", "origine": "ST MALO", "origine_iata": "FRXSL"},
+    ]
+    await trips_col.insert_many(docs)
+    rows = await TripsRepository(trips_col).origin_codes()
+    assert sorted((r["origine"], r["iata"]) for r in rows) == [
+        ("PARIS (intramuros)", "FRPLY"),
+        ("PARIS (intramuros)", "FRPMO"),
+        ("ST MALO", "FRXSL"),
+    ]
 
 
 def _hub_doc(i, date, hub):

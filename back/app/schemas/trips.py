@@ -72,3 +72,5 @@ class StationSuggestion(BaseModel):
     name: str
     raw: str
     is_metropolis: bool = False
+    # Ex. « comprend Paris Montparnasse » quand la gare a été trouvée par ce nom.
+    hint: Optional[str] = None

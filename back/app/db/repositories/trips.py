@@ -1,6 +1,5 @@
 """MongoDB access for the trips collection."""
 import logging
-import re
 from typing import Any, Iterable, Optional
 
 from app.domain.stations import HUB_METROPOLISES, trip_id
@@ -145,15 +144,10 @@ class TripsRepository:
         vals = await self._col.distinct("origine_metropolis")
         return [v for v in vals if v]
 
-    async def search_origines(self, q_norm: str, *, limit: int) -> list[str]:
-        pipeline = [
-            {"$match": {"origine_norm": {"$regex": f"^{re.escape(q_norm)}"}}},
-            {"$group": {"_id": "$origine"}},
-            # $group ne garantit aucun ordre : sans tri, les suggestions changeaient
-            # d'ordre d'un appel à l'autre (et la liste se réordonnait pendant la frappe).
-            {"$sort": {"_id": 1}},
-            {"$limit": limit * 2},
-        ]
-        cursor = await self._col.aggregate(pipeline)  # PyMongo async : aggregate est une coroutine
-        rows = await cursor.to_list(limit * 2)
-        return [r["_id"] for r in rows]
+    async def origin_codes(self) -> list[dict]:
+        """Couples distincts {origine, iata} : base de l'index de recherche des gares."""
+        cursor = await self._col.aggregate(
+            [{"$group": {"_id": {"origine": "$origine", "iata": "$origine_iata"}}}]
+        )
+        rows = await cursor.to_list(None)
+        return [{"origine": r["_id"].get("origine"), "iata": r["_id"].get("iata")} for r in rows]

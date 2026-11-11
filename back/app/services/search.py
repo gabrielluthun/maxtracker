@@ -30,7 +30,8 @@ from app.domain.stations import (
     normalize_station,
     trip_id,
 )
-from app.domain.station_labels import display_station_name
+from app.domain.station_labels import display_station_name, referential_version
+from app.domain.station_search import StationEntry, build_station_index, find_stations
 from app.domain.trips import PARIS_TZ
 from app.schemas.trips import (
     ConnectedTripOut,
@@ -90,6 +91,7 @@ class SearchService:
         self._rate_limiter = rate_limiter
         self._memory = SearchMemoryCache()
         self._rendered = RenderedResponseCache()
+        self._stations: Optional[tuple[tuple, list[StationEntry]]] = None
         self._refresh_keys: set[str] = set()
         self._refresh_tasks: set[asyncio.Task] = set()
 
@@ -103,24 +105,32 @@ class SearchService:
         logger.info("L1 cache hydrated: %d metros from Mongo (%.0fms)", len(entries), ms)
         return len(entries)
 
+    async def _station_index(self) -> list[StationEntry]:
+        """Index des gares, reconstruit quand les trajets ou les noms de gare changent."""
+        version = (await self._sync.get_last_sync_at(), referential_version())
+        if self._stations is None or self._stations[0] != version:
+            rows = await self._trips.origin_codes()
+            self._stations = (version, build_station_index(rows, label=display_station_name))
+        return self._stations[1]
+
     async def search_stations(self, q: str, *, limit: int = 15) -> list[StationSuggestion]:
         q = (q or "").strip()
         if len(q) < 3:
             return []
-        qn = normalize_station(q)
-        names = await self._trips.search_origines(qn, limit=limit)
         suggestions: list[StationSuggestion] = []
         seen_metros: set[str] = set()
-        for name in names:
-            norm = normalize_station(name)
-            metro = metropolis_for(norm)
+        for match in find_stations(q, await self._station_index()):
+            hint = f"comprend {match.alias}" if match.alias else None
+            metro = metropolis_for(normalize_station(match.raw))
             if metro and metro not in seen_metros:
                 seen_metros.add(metro)
                 suggestions.append(
-                    StationSuggestion(name=metro + " (toutes gares)", raw=metro, is_metropolis=True)
+                    StationSuggestion(
+                        name=metro + " (toutes gares)", raw=metro, is_metropolis=True, hint=hint
+                    )
                 )
             suggestions.append(
-                StationSuggestion(name=name.title(), raw=name, is_metropolis=False)
+                StationSuggestion(name=match.raw.title(), raw=match.raw, is_metropolis=False, hint=hint)
             )
             if len(suggestions) >= limit:
                 break

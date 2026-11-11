@@ -160,6 +160,11 @@ async def refresh_trigramme_map_if_stale(
     return await refresh_trigramme_map(**kwargs)
 
 
+def referential_version() -> Optional[float]:
+    """Change à chaque rechargement du référentiel (pour invalider ce qui en dépend)."""
+    return _trigramme_loaded_at
+
+
 def clear_trigramme_cache() -> None:
     """Réinitialise le référentiel en mémoire (tests)."""
     global _trigramme_map, _trigramme_loaded_at

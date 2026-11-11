@@ -254,7 +254,7 @@ Préfixe : `/api`
 | `GET` | `/` | Santé (réponse fixe) |
 | `GET` | `/health` | Supervision : MongoDB + fraîcheur des syncs (`ok` / `degraded` → 200, `down` → 503) |
 | `GET` | `/search?origin={gare}&connections=0\|1&compact=0\|1` | Trajets par destination (cache L1/L2). Par défaut : réponse complète. `connections=0` : directs seuls (+ `omitted_connected_trips`) ; `compact=1` : sans les champs recalculés côté client (lien SNCF Connect, ids…) |
-| `GET` | `/stations/search?q={texte}` | Autocomplétion gares (≥ 3 caractères) |
+| `GET` | `/stations/search?q={texte}` | Autocomplétion gares (≥ 3 caractères) : insensible aux accents, tirets et « Saint »/« St », mots n'importe où dans le nom, gares regroupées par la SNCF retrouvées par leur vrai nom (« Montparnasse » → Paris) |
 | `GET` | `/sync/info` | État de la synchronisation |
 | `POST` | `/sync/trigger` | Sync manuelle SNCF + warm cache (1 toutes les 3 min, sinon HTTP 429 + `Retry-After`) |
 
