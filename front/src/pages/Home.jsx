@@ -10,14 +10,16 @@ import {
   useTransition,
 } from "react";
 import { toast } from "sonner";
-import { List, CalendarDays, BarChart3, Sparkles, AlertCircle, Inbox } from "lucide-react";
+import { List, CalendarDays, BarChart3, Sparkles, AlertCircle, Inbox, X } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import FiltersPanel from "@/components/FiltersPanel";
 import MobileFiltersSheet from "@/components/MobileFiltersSheet";
 import {
   DEFAULT_DATE_HORIZON_DAYS,
+  departuresForCharts,
   enrichSearchGroups,
   filterPreparedGroups,
+  formatTripDayLabel,
 } from "@/lib/tripTime";
 import DestinationGroup from "@/components/DestinationGroup";
 import DestinationGroupSkeleton from "@/components/DestinationGroupSkeleton";
@@ -46,6 +48,7 @@ const defaultFilters = {
   maxConnections: 0,
   maxDurationMinutes: null,
   dateHorizonDays: DEFAULT_DATE_HORIZON_DAYS,
+  selectedDate: null, // jour choisi dans le calendrier (YYYY-MM-DD)
 };
 
 const MOBILE_INITIAL_DESTINATIONS = 10;
@@ -146,16 +149,30 @@ export default function Home({ syncInfo, registerRerunSearch }) {
     return { groups, totalTrips: total };
   }, [preparedGroups, deferredFilters, hidden]);
 
-  const allFilteredTrips = useMemo(() => {
-    if (tab === "list") return [];
-    return filteredGroups.flatMap((g) => [
-      ...g.trips,
-      ...(g.connected_trips || []).map((c) => ({
-        date: c.date,
-        heure_depart: c.heure_depart,
-      })),
-    ]);
-  }, [filteredGroups, tab]);
+  const chartTrips = useMemo(
+    () => (tab === "chart" ? departuresForCharts(filteredGroups) : []),
+    [filteredGroups, tab]
+  );
+
+  // Le calendrier montre tous les jours de l'horizon, même si un jour est sélectionné.
+  const calendarTrips = useMemo(() => {
+    if (tab !== "calendar") return [];
+    const { groups } = filterPreparedGroups(
+      preparedGroups,
+      { ...deferredFilters, selectedDate: null },
+      hidden
+    );
+    return departuresForCharts(groups);
+  }, [preparedGroups, deferredFilters, hidden, tab]);
+
+  const onSelectDay = useCallback(
+    (date) => {
+      onFiltersChange({ ...filters, selectedDate: date });
+      setTab("list");
+    },
+    [filters, onFiltersChange]
+  );
+  const clearSelectedDay = () => onFiltersChange({ ...filters, selectedDate: null });
 
   useEffect(() => {
     setMobileVisibleDestinations(MOBILE_INITIAL_DESTINATIONS);
@@ -285,6 +302,25 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                   </TabsList>
                 </div>
 
+                {filters.selectedDate && (
+                  <div className="mb-4" data-testid="day-filter-chip">
+                    <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold filter-chip-active">
+                      <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                      {formatTripDayLabel(filters.selectedDate)}
+                      <button
+                        type="button"
+                        onClick={clearSelectedDay}
+                        className="-mr-1 rounded-full p-0.5 hover:bg-white/20"
+                        aria-label="Afficher tous les jours"
+                        title="Afficher tous les jours"
+                        data-testid="day-filter-clear"
+                      >
+                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </span>
+                  </div>
+                )}
+
                 <TabsContent value="list">
                   {filteredGroups.length === 0 ? (
                     <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center text-slate-500" data-testid="no-results-after-filter">
@@ -318,13 +354,20 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                 </TabsContent>
 
                 <TabsContent value="calendar">
-                  {tab === "calendar" && <CalendarView trips={allFilteredTrips} />}
+                  {tab === "calendar" && (
+                    <CalendarView
+                      trips={calendarTrips}
+                      horizonDays={deferredFilters.dateHorizonDays ?? DEFAULT_DATE_HORIZON_DAYS}
+                      selectedDate={filters.selectedDate}
+                      onSelectDay={onSelectDay}
+                    />
+                  )}
                 </TabsContent>
 
                 <TabsContent value="chart">
                   {tab === "chart" && (
                     <Suspense fallback={<Skeleton className="h-80 rounded-2xl" />}>
-                      <PeakHoursChart trips={allFilteredTrips} />
+                      <PeakHoursChart trips={chartTrips} />
                     </Suspense>
                   )}
                 </TabsContent>

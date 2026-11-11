@@ -186,6 +186,7 @@ function matchesCommonFiltersCtx(item, ctx) {
   const { filters, today, horizonLast, maxDuration } = ctx;
   if (item._past) return false;
   if (horizonLast != null && (item.date < today || item.date > horizonLast)) return false;
+  if (filters.selectedDate && item.date !== filters.selectedDate) return false;
   if (filters.departureTodayOnly && !item._today) return false;
   if (filters.weekendOnly && !item._weekend) return false;
   if (!filters.timeSlots[item._slot]) return false;
@@ -276,6 +277,14 @@ export function filterPreparedGroups(preparedGroups, filters, hidden, prevCache 
   }
 
   return { groups: out, totalTrips, cache: nextCache };
+}
+
+/** Départs (directs + premiers trains des correspondances) pour le calendrier et le graphique. */
+export function departuresForCharts(groups) {
+  return groups.flatMap((g) => [
+    ...g.trips,
+    ...(g.connected_trips || []).map((c) => ({ date: c.date, heure_depart: c.heure_depart })),
+  ]);
 }
 
 /** Regroupe directs et correspondances par date, triés par heure de départ. */

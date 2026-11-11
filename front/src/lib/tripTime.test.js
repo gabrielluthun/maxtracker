@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   arrivalDayOffset,
+  createFilterContext,
+  enrichSearchGroups,
+  filterPreparedGroups,
   calendarDays,
   isImminentDeparture,
   minutesUntilDeparture,
@@ -56,5 +59,39 @@ describe("arrivalDayOffset", () => {
     expect(arrivalDayOffset("07:00", 130)).toBe(0);
     expect(arrivalDayOffset("23:30", 30)).toBe(1); // arrivée à 00:00 pile
     expect(arrivalDayOffset("08:00", null)).toBe(0);
+  });
+});
+
+describe("selectedDate filter", () => {
+  const filters = {
+    departureTodayOnly: false,
+    weekendOnly: false,
+    timeSlots: { morning: true, afternoon: true, evening: true },
+    showInoui: true,
+    showIntercites: true,
+    showIntercitesNuit: true,
+    maxConnections: 1,
+    maxDurationMinutes: null,
+    dateHorizonDays: 30,
+    selectedDate: null,
+  };
+  const { today } = createFilterContext(filters);
+  const [y, m, d] = today.split("-").map(Number);
+  const tomorrow = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+  const later = new Date(Date.UTC(y, m - 1, d + 2)).toISOString().slice(0, 10);
+  const trip = (date) => ({ date, heure_depart: "23:59", heure_arrivee: "23:59", train_type: "TGV_INOUI" });
+  const groups = enrichSearchGroups([
+    { destination_city: "Lyon", trips: [trip(tomorrow), trip(later)], connected_trips: [] },
+    { destination_city: "Nice", trips: [trip(later)], connected_trips: [] },
+  ]);
+
+  it("keeps only trips of the chosen day and drops empty groups", () => {
+    const { groups: out, totalTrips } = filterPreparedGroups(groups, { ...filters, selectedDate: tomorrow }, []);
+    expect(out.map((g) => g.destination_city)).toEqual(["Lyon"]);
+    expect(totalTrips).toBe(1);
+  });
+
+  it("shows every day when no day is selected", () => {
+    expect(filterPreparedGroups(groups, filters, []).totalTrips).toBe(3);
   });
 });
