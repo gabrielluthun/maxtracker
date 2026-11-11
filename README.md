@@ -149,7 +149,7 @@ cd back
 cp .env.example .env
 # Par défaut : MONGO_URL=mongodb://127.0.0.1:27017
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # dépendances de l'app + outils de test
 uvicorn server:app --reload --port 8000
 
 # Frontend (autre terminal)
@@ -170,7 +170,8 @@ Au premier lancement avec une base vide, une **sync SNCF automatique** s'exécut
 tgvmax-platform/
 ├── back/                          # API FastAPI
 │   ├── server.py                  # Point d'entrée Uvicorn
-│   ├── requirements.txt
+│   ├── requirements.txt           # dépendances de production
+│   ├── requirements-dev.txt       # + pytest (développement, CI)
 │   ├── runtime.txt                # Version Python (Render)
 │   ├── .env.example
 │   ├── app/
