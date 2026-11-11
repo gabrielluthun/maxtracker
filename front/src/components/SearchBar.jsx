@@ -58,7 +58,9 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
           setSuggestions(res);
         }
       } catch (e) {
-        if (active && e?.code !== "ERR_CANCELED") throw e;
+        // Requête annulée (frappe suivante) : normal. Autre erreur : liste vide,
+        // au lieu d'une exception non rattrapée dans le setTimeout.
+        if (active && e?.code !== "ERR_CANCELED") setSuggestions([]);
       } finally {
         if (active) setStationsLoading(false);
       }
