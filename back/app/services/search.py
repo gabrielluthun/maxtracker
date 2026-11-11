@@ -1,11 +1,14 @@
 """Trip search and station autocomplete."""
 import asyncio
+import gzip
+import json
 import logging
 import time
 from datetime import datetime, timezone
+from typing import Any, Optional
 
 from app.config import Settings
-from app.core.memory_cache import SearchMemoryCache
+from app.core.memory_cache import RenderedResponseCache, SearchMemoryCache
 from app.core.rate_limit import RateLimiter, RateLimitExceeded
 from app.db.repositories.search_cache import SearchCacheRepository
 from app.db.repositories.sync_state import SyncStateRepository
@@ -28,7 +31,7 @@ from app.domain.stations import (
     trip_id,
 )
 from app.domain.station_labels import display_station_name
-from app.domain.trips import filter_departed_from_payload
+from app.domain.trips import PARIS_TZ
 from app.schemas.trips import (
     ConnectedTripOut,
     DestinationGroup,
@@ -37,12 +40,14 @@ from app.schemas.trips import (
     TripOut,
 )
 from app.services.connections import merge_connected_into_groups
+from app.services.search_render import render_search_payload
 from app.services.sncf.client import SncfClient
 from app.services.sncf.connect import build_sncf_connect_url
 
 logger = logging.getLogger("maxtracker")
 
 _DERIVED_TRIP_FIELDS = ("origine_label", "destination_label", "sncf_connect_url")
+_RESPONSE_GZIP_LEVEL = 6
 
 
 def _slim_trip(trip: dict) -> dict:
@@ -84,6 +89,7 @@ class SearchService:
         self._cache = cache_repo
         self._rate_limiter = rate_limiter
         self._memory = SearchMemoryCache()
+        self._rendered = RenderedResponseCache()
         self._refresh_keys: set[str] = set()
         self._refresh_tasks: set[asyncio.Task] = set()
 
@@ -187,73 +193,91 @@ class SearchService:
         groups_out.sort(key=lambda x: (-x.trip_count, x.destination_city))
         return groups_out
 
-    def _enrich_trip_dict(self, trip: dict) -> dict:
-        enriched = dict(trip)
-        enriched["origine_label"] = display_station_name(
-            enriched.get("origine", ""), enriched.get("origine_iata")
-        )
-        enriched["destination_label"] = display_station_name(
-            enriched.get("destination", ""), enriched.get("destination_iata")
-        )
-        enriched["sncf_connect_url"] = build_sncf_connect_url(
+    def _connect_url(self, trip: dict[str, Any]) -> str:
+        return build_sncf_connect_url(
             self._settings,
-            enriched.get("origine_iata", ""),
-            enriched.get("destination_iata", ""),
-            enriched.get("date", ""),
-            enriched.get("heure_depart", ""),
-            enriched.get("origine", ""),
-            enriched.get("destination", ""),
+            trip.get("origine_iata", ""),
+            trip.get("destination_iata", ""),
+            trip.get("date", ""),
+            trip.get("heure_depart", ""),
+            trip.get("origine", ""),
+            trip.get("destination", ""),
         )
-        return enriched
 
-    def _enrich_cached_payload(self, payload: dict) -> dict:
-        enriched = dict(payload)
-        groups = []
-        for group in enriched.get("groups", []):
-            g = dict(group)
-            g["trips"] = [self._enrich_trip_dict(t) for t in g.get("trips", [])]
-            connected = []
-            for journey in g.get("connected_trips", []):
-                j = dict(journey)
-                j["legs"] = [self._enrich_trip_dict(leg) for leg in j.get("legs", [])]
-                connected.append(j)
-            g["connected_trips"] = connected
-            groups.append(g)
-        enriched["groups"] = groups
-        return enriched
+    async def search_gzip(
+        self,
+        origin: str,
+        *,
+        client_ip: str = "anon",
+        connections: bool = True,
+        compact: bool = False,
+        now: Optional[datetime] = None,
+    ) -> bytes:
+        """Réponse /search sérialisée en JSON puis compressée (gzip).
 
-    def _response_from_cached(self, origin: str, cached: dict) -> SearchResponse:
-        payload = filter_departed_from_payload({**cached["payload"], "origin": origin.strip()})
-        payload = self._enrich_cached_payload(payload)
-        return SearchResponse(**payload)
-
-    async def search_trips(self, origin: str, *, client_ip: str = "anon") -> SearchResponse:
+        La mise en forme est mise en cache par (origine, variante, données,
+        minute) : un hit coûte une recherche dans un dict au lieu de
+        ré-enrichir et revalider ~20 000 trajets à chaque requête.
+        """
         started = time.monotonic()
+        origin_clean = origin.strip()
+        key = self._cache_key(origin_clean)
+        cached, source = await self._cached_payload(origin_clean, key, client_ip=client_ip)
+
+        now = (now or datetime.now(timezone.utc)).astimezone(PARIS_TZ)
+        render_key = (
+            key,
+            origin_clean,
+            connections,
+            compact,
+            cached.get("sync_at"),
+            now.strftime("%Y-%m-%dT%H:%M"),
+        )
+        body = self._rendered.get(render_key)
+        hit = body is not None
+        if body is None:
+            payload = render_search_payload(
+                cached["payload"],
+                origin=origin_clean,
+                connections=connections,
+                compact=compact,
+                connect_url=self._connect_url,
+                now=now,
+            )
+            raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            body = gzip.compress(raw, compresslevel=_RESPONSE_GZIP_LEVEL)
+            if source != "uncached":
+                self._rendered.set(render_key, body)
+        logger.info(
+            "search %s origin=%r connections=%s compact=%s rendered_hit=%s gzip=%d duration=%.3fs",
+            source,
+            origin_clean,
+            connections,
+            compact,
+            hit,
+            len(body),
+            time.monotonic() - started,
+        )
+        return body
+
+    async def _cached_payload(
+        self, origin: str, key: str, *, client_ip: str
+    ) -> tuple[dict[str, Any], str]:
+        """Payload allégé + sync_at, depuis L1, L2 ou un calcul à froid (rate-limité)."""
         last_sync = await self._sync.get_last_sync_at()
-        key = self._cache_key(origin)
 
         mem_cached = self._memory.get(key)
         if mem_cached:
             if last_sync is not None and mem_cached.get("sync_at") != last_sync:
                 self._schedule_refresh(origin, key)
-            logger.info(
-                "search L1 hit origin=%r duration=%.3fs",
-                origin,
-                time.monotonic() - started,
-            )
-            return self._response_from_cached(origin, mem_cached)
+            return mem_cached, "L1"
 
         mongo_cached = await self._cache.get(key)
         if mongo_cached:
             self._memory.set(key, mongo_cached["payload"], sync_at=mongo_cached.get("sync_at"))
             if last_sync is not None and mongo_cached.get("sync_at") != last_sync:
                 self._schedule_refresh(origin, key)
-            logger.info(
-                "search L2 hit origin=%r duration=%.3fs",
-                origin,
-                time.monotonic() - started,
-            )
-            return self._response_from_cached(origin, mongo_cached)
+            return {"payload": mongo_cached["payload"], "sync_at": mongo_cached.get("sync_at")}, "L2"
 
         self._rate_limiter.check(client_ip)
 
@@ -265,8 +289,11 @@ class SearchService:
             time.monotonic() - compute_started,
             resp.total_trips,
         )
-        await self._store_cache(key, resp)
-        return resp
+        payload = slim_cache_payload(resp.model_dump(mode="json"))
+        await self._store_cache(key, payload, served=resp.served, sync_at=resp.last_sync_at)
+        if not resp.served:
+            return {"payload": {**payload, "served": False}, "sync_at": resp.last_sync_at}, "uncached"
+        return {"payload": payload, "sync_at": resp.last_sync_at}, "cold"
 
     def _schedule_refresh(self, origin: str, key: str) -> None:
         if key in self._refresh_keys:
@@ -286,7 +313,7 @@ class SearchService:
                     origin,
                 )
                 return
-            await self._store_cache(key, resp)
+            await self._store_response(key, resp)
             logger.info(
                 "background refresh ok origin=%r duration=%.2fs total=%d",
                 origin,
@@ -298,13 +325,20 @@ class SearchService:
         finally:
             self._refresh_keys.discard(key)
 
-    async def _store_cache(self, key: str, resp: SearchResponse) -> None:
+    async def _store_response(self, key: str, resp: SearchResponse) -> None:
         if not resp.served:
             return
         payload = slim_cache_payload(resp.model_dump(mode="json"))
-        self._memory.set(key, payload, sync_at=resp.last_sync_at)
+        await self._store_cache(key, payload, served=True, sync_at=resp.last_sync_at)
+
+    async def _store_cache(
+        self, key: str, payload: dict, *, served: bool, sync_at: Optional[str]
+    ) -> None:
+        if not served:
+            return
+        self._memory.set(key, payload, sync_at=sync_at)
         try:
-            await self._cache.set(key, payload, sync_at=resp.last_sync_at)
+            await self._cache.set(key, payload, sync_at=sync_at)
         except Exception:
             logger.exception("cache set failed key=%r", key)
 
@@ -317,6 +351,7 @@ class SearchService:
             return 0
 
         self._memory.clear()
+        self._rendered.clear()
         sem = asyncio.Semaphore(self._settings.cache_warm_concurrency)
         count = 0
 
@@ -328,7 +363,7 @@ class SearchService:
                     if not resp.served:
                         return
                     key = self._cache_key(origin)
-                    await self._store_cache(key, resp)
+                    await self._store_response(key, resp)
                     count += 1
                 except Exception:
                     logger.exception("cache warm failed origin=%r", origin)
