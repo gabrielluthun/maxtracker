@@ -2,6 +2,8 @@ import { memo } from "react";
 import { ExternalLink, Train, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatTripDayLabel } from "@/lib/tripTime";
+import { tripConnectUrl } from "@/lib/sncfConnect";
+import { tripKey } from "@/lib/tripKeys";
 
 const TRAIN_TYPE_STYLES = {
   TGV_INOUI: { ribbon: "bg-[#E11D48]", badge: "bg-[#E11D48] text-white", label: "TGV INOUI" },
@@ -49,7 +51,7 @@ function TrainCard({ trip, label }) {
 
   return (
     <div
-      data-testid={`train-card-${trip.id}`}
+      data-testid={`train-card-${tripKey(trip)}`}
       className="card-hover bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden flex flex-col sm:flex-row"
     >
       <div className={cn("sm:w-2 h-2 sm:h-auto", style.ribbon)} />
@@ -101,7 +103,7 @@ function TrainCard({ trip, label }) {
           </div>
           <a
             data-testid="sncf-connect-link"
-            href={trip.sncf_connect_url}
+            href={tripConnectUrl(trip)}
             target="_blank"
             rel="noopener noreferrer"
             title={`Réserver sur SNCF Connect : ${origineLabel} → ${destinationLabel}, ${dayLabel} à ${fmtHHmm(trip.heure_depart)}`}

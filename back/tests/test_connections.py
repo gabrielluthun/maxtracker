@@ -3,10 +3,11 @@ import unittest
 
 from app.domain.connections import (
     TripSegment,
-    build_departures_from_hub_index,
+    HubDepartureIndex,
     candidate_connection_dates,
     connectable_hub,
     connection_wait_minutes,
+    departure_abs_minutes,
     find_all_connected_journeys,
     hub_date_keys_from_outbound,
     hubs_reachable_as_first_leg,
@@ -198,13 +199,36 @@ class TestExclusions(unittest.TestCase):
 
 
 class TestIndexAndHelpers(unittest.TestCase):
-    def test_build_index_groups_by_date_and_hub(self):
-        a = _seg(date="2026-06-10", origine_metropolis="Paris", train_no="1")
-        b = _seg(date="2026-06-10", origine_metropolis="Paris", train_no="2")
-        c = _seg(date="2026-06-11", origine_metropolis="Paris", train_no="3")
-        idx = build_departures_from_hub_index([a, b, c])
-        self.assertEqual(len(idx[("2026-06-10", "Paris")]), 2)
-        self.assertEqual(len(idx[("2026-06-11", "Paris")]), 1)
+    def test_index_returns_departures_in_absolute_window(self):
+        a = _seg(date="2026-06-10", origine_metropolis="Paris", train_no="1", heure_depart="10:00")
+        b = _seg(date="2026-06-10", origine_metropolis="Paris", train_no="2", heure_depart="08:00")
+        c = _seg(date="2026-06-11", origine_metropolis="Paris", train_no="3", heure_depart="01:00")
+        lyon = _seg(date="2026-06-10", origine_metropolis="Lyon", train_no="4")
+        not_hub = _seg(date="2026-06-10", origine_metropolis=None, train_no="5")
+        idx = HubDepartureIndex([a, b, c, lyon, not_hub])
+        day = departure_abs_minutes(b) - 8 * 60  # 2026-06-10 00:00
+        # Trié par heure de départ, et la fenêtre franchit minuit.
+        self.assertEqual(
+            [s.train_no for s in idx.departures_between("Paris", day, day + 26 * 60)],
+            ["2", "1", "3"],
+        )
+        self.assertEqual(
+            [s.train_no for s in idx.departures_between("Paris", day + 9 * 60, day + 10 * 60)],
+            ["1"],
+        )
+        self.assertEqual(idx.departures_between("Nice", day, day + 24 * 60), [])
+
+    def test_connections_from_uses_wait_window(self):
+        leg1 = _seg(heure_depart="06:00", heure_arrivee="09:00",
+                    origine_metropolis="Lille", destination_metropolis="Paris")
+        too_soon = _seg(train_no="2", heure_depart="09:10", origine_metropolis="Paris")
+        ok = _seg(train_no="3", heure_depart="10:00", origine_metropolis="Paris")
+        too_late = _seg(train_no="4", heure_depart="15:30", origine_metropolis="Paris")
+        idx = HubDepartureIndex([too_soon, ok, too_late])
+        self.assertEqual(
+            [s.train_no for s in idx.connections_from(leg1, max_connect_minutes=6 * 60)],
+            ["3"],
+        )
 
     def test_hubs_reachable_from_origin(self):
         legs = [

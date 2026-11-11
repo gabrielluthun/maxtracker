@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const BACKEND_URL =
-  process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+  import.meta.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
 export const API = `${BACKEND_URL}/api`;
 
 export const api = axios.create({ baseURL: API, timeout: 120000 });
@@ -12,8 +12,15 @@ export async function searchStations(q) {
   return data || [];
 }
 
-export async function searchTrips(origin) {
-  const { data } = await api.get(`/search`, { params: { origin } });
+/**
+ * Trajets au départ d'une gare.
+ * - `connections: false` (défaut) : directs seuls, ~6× plus léger ;
+ * - `compact: 1` : sans les champs recalculés côté client (lien SNCF Connect, ids…).
+ */
+export async function searchTrips(origin, { connections = false } = {}) {
+  const { data } = await api.get(`/search`, {
+    params: { origin, connections: connections ? 1 : 0, compact: 1 },
+  });
   return data;
 }
 

@@ -1,3 +1,4 @@
+import { describe, expect, it } from "vitest";
 import { calendarDays, mondayFirstWeekdayIndex } from "./tripTime";
 
 describe("calendarDays", () => {

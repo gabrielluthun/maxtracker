@@ -54,6 +54,8 @@ class SearchResponse(BaseModel):
     groups: List[DestinationGroup]
     last_sync_at: Optional[str] = None
     served: bool = True
+    # Uniquement avec connections=false : parcours avec correspondance non inclus.
+    omitted_connected_trips: Optional[int] = None
 
 
 class SyncInfo(BaseModel):

@@ -128,7 +128,7 @@ Ce dépôt contient le code source de MaxTracker (API FastAPI + interface React)
 
 ### Démarrage local
 
-**Prérequis :** Python 3.11, Node.js 18+, MongoDB.
+**Prérequis :** Python 3.11, Node.js 20.19+ (requis par Vite), MongoDB.
 
 **MongoDB local fortement recommandé** pour des temps de réponse corrects (cache de recherche ~200 Mo) : une source distante ajoute une latence réseau importante sur les interactions utilisateur.
 
@@ -193,8 +193,9 @@ tgvmax-platform/
 │   │       ├── sync.py            # pipeline SNCF → Mongo
 │   │       └── sncf/              # client Open Data + liens Connect
 │   └── tests/
-├── front/                         # SPA React (CRA + Craco)
-│   ├── public/
+├── front/                         # SPA React (Vite)
+│   ├── index.html                 # point d'entrée Vite
+│   ├── vite.config.mjs            # alias @/, port 3000, sortie build/, Vitest
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── AppRouter.jsx      # navigation Recherche / À propos
@@ -205,7 +206,7 @@ tgvmax-platform/
 │   │   ├── pages/
 │   │   │   ├── Home.jsx
 │   │   │   └── About.jsx
-│   │   └── lib/                   # api, storage, tripTime, utils
+│   │   └── lib/                   # api, sncfConnect, storage, tripKeys, tripTime, utils
 │   └── package.json
 ├── doc/
 │   ├── regles-de-gestion.md
@@ -232,7 +233,7 @@ Optionnel :
 | `CACHE_WARM_CONCURRENCY` | `8` | Parallélisme du warm cache post-sync |
 | `SEARCH_RESULT_LIMIT` | `5000` | Plafond de documents Mongo par requête recherche |
 
-**Frontend** (build) : `REACT_APP_BACKEND_URL` — URL du backend **sans** `/api`.
+**Frontend** (build) : `REACT_APP_BACKEND_URL` — URL du backend **sans** `/api` (préfixe `REACT_APP_` conservé via `envPrefix` dans `vite.config.mjs`).
 
 ### API
 
@@ -241,20 +242,21 @@ Préfixe : `/api`
 | Méthode | Route | Description |
 |---------|-------|-------------|
 | `GET` | `/` | Santé |
-| `GET` | `/search?origin={gare}` | Trajets directs + `connected_trips` par destination (cache L1/L2) |
+| `GET` | `/search?origin={gare}&connections=0\|1&compact=0\|1` | Trajets par destination (cache L1/L2). Par défaut : réponse complète. `connections=0` : directs seuls (+ `omitted_connected_trips`) ; `compact=1` : sans les champs recalculés côté client (lien SNCF Connect, ids…) |
 | `GET` | `/stations/search?q={texte}` | Autocomplétion gares (≥ 3 caractères) |
 | `GET` | `/sync/info` | État de la synchronisation |
 | `POST` | `/sync/trigger` | Sync manuelle SNCF + warm cache (1 toutes les 3 min, sinon HTTP 429 + `Retry-After`) |
 
 Comportements notables :
 
-- **Cache** : L1 mémoire (LRU) + L2 collection Mongo `search_cache` ; refresh stale en arrière-plan si les données SNCF ont changé.
+- **Cache** : L1 mémoire (LRU) + L2 collection Mongo `search_cache` ; refresh stale en arrière-plan si les données SNCF ont changé. Les réponses mises en forme et compressées sont aussi gardées en mémoire, par origine, variante et minute (~3 ms par hit).
+- **Volumes** (Paris) : complet 640 Ko gzip ; directs seuls + compact 43 Ko — c'est ce que charge le front par défaut, les correspondances n'étant demandées que si le filtre les affiche.
 - **Rate limit** : 10 recherches « cold compute » / minute / IP (HTTP 429) ; les hits cache ne sont pas limités.
 - **Compression** : réponses > 1 Ko compressées en gzip (niveau 6) — `/search` Paris passe de ~17,7 Mo à ~640 Ko.
 - **Sync** : une seule à la fois (verrou) ; la collection `trips` est remplacée de façon atomique (`trips_staging` puis `renameCollection`). Le référentiel des gares (libellés) est chargé en arrière-plan et rechargé au plus une fois par jour.
 - **Première recherche** sur une origine non cachée : calcul serveur (~15–25 s) ; les recherches suivantes sont quasi instantanées avec Mongo.
 
-Tests backend : `cd back && pytest tests/`
+Tests backend : `cd back && pytest tests/` · Tests et lint frontend : `cd front && npm test && npm run lint`
 
 ### Documentation technique
 
@@ -269,7 +271,7 @@ Tests backend : `cd back && pytest tests/`
 
 | Couche | Technologie |
 |--------|-------------|
-| Frontend | React 19, TanStack Query, Tailwind CSS, Radix UI, Recharts |
+| Frontend | React 19, Vite, TanStack Query, Tailwind CSS, Radix UI, Recharts (chargé à la demande), Vitest |
 | Backend | FastAPI, Uvicorn, Motor, APScheduler |
 | Base | MongoDB (`trips`, `sync_state`, `search_cache`) |
 | Source | [Open Data SNCF, jeu tgvmax](https://data.sncf.com/explore/dataset/tgvmax/) |
