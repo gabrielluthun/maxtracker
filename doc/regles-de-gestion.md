@@ -36,9 +36,10 @@
 ## 🔄 3. Collecte & Gestion des données (Backend)
 
 **RG1**: Le système **doit** synchroniser les données de l'API Open Data SNCF toutes les 15 minutes
-**RG2**: Le système **doit** conserver uniquement les trajets ayant l'éligibilité TGV Max active  
+**RG2**: Le système **doit** conserver uniquement les trajets ayant l'éligibilité TGV Max active (`od_happy_card = OUI`), sans les filtrer davantage selon le type de train  
 **RG3**: Le système ne **doit** **PAS** intégrer les trajets dont la date de départ dépasse les 30 jours glissants  
 **RG4**: Le système **doit** supprimer automatiquement de la base locale les trains dont l'heure de départ est passée  
 **RG5**: Le système **doit** rejeter les doublons de trajets basés sur le numéro de train, la date et les gares  
 **RG6**: Le système **doit** basculer sur l'affichage des données du cache si l'API Open Data SNCF est indisponible  
 **RG7**: Le système **doit** limiter le nombre de recherches à 10 par minute et par utilisateur pour éviter les surcharges  
+**RG31**: Le système ne **doit** **PAS** intégrer les trajets dont les gares de départ et d'arrivée sont dans la même ville (ex. Lyon Perrache → Lyon Part-Dieu)  
