@@ -54,6 +54,21 @@ export function addCalendarDays(isoDate, days) {
   return dt.toISOString().slice(0, 10);
 }
 
+/**
+ * `count` dates ISO consécutives à partir de `fromDate` (YYYY-MM-DD).
+ * Calcul sur les chaînes ISO, indépendant du fuseau du navigateur.
+ */
+export function calendarDays(fromDate, count) {
+  return Array.from({ length: count }, (_, i) => addCalendarDays(fromDate, i));
+}
+
+/** Position du jour dans une semaine commençant le lundi (lundi = 0 … dimanche = 6). */
+export function mondayFirstWeekdayIndex(isoDate) {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const sundayFirst = new Date(Date.UTC(y, m - 1, d, 12, 0, 0)).getUTCDay();
+  return (sundayFirst + 6) % 7;
+}
+
 /** Dernière date incluse pour un horizon de N jours à partir de `fromDate`. */
 export function horizonLastDate(fromDate, horizonDays) {
   if (horizonDays == null) return null;
