@@ -1,7 +1,23 @@
 import { useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { useIsDarkMode } from "@/hooks/useIsDarkMode";
+
+// Du plus intense au vide. En sombre : moins de vert pâle éblouissant.
+const BAR_COLORS = {
+  light: { high: "#10B981", mid: "#34D399", low: "#A7F3D0", empty: "#E2E8F0" },
+  dark: { high: "#34D399", mid: "#10B981", low: "#047857", empty: "#334155" },
+};
+
+function barColor(intensity, palette) {
+  if (intensity > 0.7) return palette.high;
+  if (intensity > 0.4) return palette.mid;
+  if (intensity > 0) return palette.low;
+  return palette.empty;
+}
 
 export default function PeakHoursChart({ trips }) {
+  const dark = useIsDarkMode();
+  const palette = dark ? BAR_COLORS.dark : BAR_COLORS.light;
   const data = useMemo(() => {
     const buckets = Array.from({ length: 24 }, (_, h) => ({ hour: h, count: 0 }));
     for (const t of trips) {
@@ -19,20 +35,27 @@ export default function PeakHoursChart({ trips }) {
         <div className="text-xs text-slate-500">Répartition par heure de départ</div>
       </div>
       <div className="h-64">
-        <ResponsiveContainer width="100%" height="100%">
+        {/* initialDimension : évite un premier rendu à -1 px (avertissement Recharts). */}
+        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 640, height: 256 }}>
           <BarChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748B" }} interval={1} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} />
             <Tooltip
-              contentStyle={{ background: "#0A2540", border: "none", borderRadius: 8, color: "#fff", fontSize: 12 }}
+              contentStyle={{
+                background: dark ? "#1E293B" : "#0A2540",
+                border: dark ? "1px solid #334155" : "none",
+                borderRadius: 8,
+                color: "#fff",
+                fontSize: 12,
+              }}
               labelStyle={{ color: "#fff", fontWeight: 600 }}
               itemStyle={{ color: "#E2E8F0" }}
-              cursor={{ fill: "rgba(10, 37, 64, 0.08)" }}
+              cursor={{ fill: dark ? "rgba(148, 163, 184, 0.12)" : "rgba(10, 37, 64, 0.08)" }}
               formatter={(v) => [`${v} train${v > 1 ? "s" : ""}`, "Éligibilité"]}
             />
             <Bar dataKey="count" radius={[6, 6, 0, 0]}>
               {data.map((d, i) => (
-                <Cell key={i} fill={d.intensity > 0.7 ? "#10B981" : d.intensity > 0.4 ? "#34D399" : d.intensity > 0 ? "#A7F3D0" : "#E2E8F0"} />
+                <Cell key={i} fill={barColor(d.intensity, palette)} />
               ))}
             </Bar>
           </BarChart>

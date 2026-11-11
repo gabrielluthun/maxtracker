@@ -4,6 +4,7 @@ import {
   getParisClock,
   mondayFirstWeekdayIndex,
 } from "@/lib/tripTime";
+import { cn } from "@/lib/utils";
 
 const WEEKDAYS = ["L", "M", "M", "J", "V", "S", "D"];
 const CALENDAR_DAYS = 30;
@@ -40,16 +41,18 @@ export default function CalendarView({ trips }) {
           const n = counts[k] || 0;
           const intensity = n === 0 ? 0 : 0.15 + (n / max) * 0.85;
           const isToday = k === today;
+          const strong = intensity > 0.5;
           return (
             <div
               key={k}
               data-testid={`cal-cell-${k}`}
-              className="aspect-square rounded-lg flex flex-col items-center justify-center text-center border border-slate-100"
-              style={{
-                background: n === 0 ? "#F8FAFC" : `rgba(16,185,129,${intensity})`,
-                color: n > 0 && intensity > 0.5 ? "white" : "#0F172A",
-                outline: isToday ? "2px solid #0A2540" : "none",
-              }}
+              className={cn(
+                "aspect-square rounded-lg flex flex-col items-center justify-center text-center border border-slate-100",
+                n === 0 && "bg-slate-50 text-slate-400 dark:bg-slate-800/60 dark:text-slate-500",
+                n > 0 && (strong ? "text-white" : "text-slate-900 dark:text-slate-100"),
+                isToday && "ring-2 ring-[#0A2540] dark:ring-emerald-300 ring-offset-1 ring-offset-white dark:ring-offset-slate-900"
+              )}
+              style={n > 0 ? { background: `rgba(16,185,129,${intensity})` } : undefined}
             >
               <div className="text-[11px] opacity-70">{Number(k.slice(8, 10))}</div>
               <div className="font-mono text-sm font-semibold leading-none mt-0.5">{n || ""}</div>
