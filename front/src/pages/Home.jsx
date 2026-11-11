@@ -284,8 +284,8 @@ export default function Home({ syncInfo, registerRerunSearch }) {
               depuis votre gare.
             </h1>
             <p className="mt-4 text-base sm:text-lg text-slate-600 max-w-2xl">
-              Saisissez votre gare de départ : MaxTracker consulte les disponibilités en temps quasi-réel et regroupe
-              pour vous toutes les destinations accessibles depuis n'importe quelle gare TGV.
+              Saisissez votre gare de départ : MaxTracker reprend les disponibilités TGV Max publiées chaque matin
+              par la SNCF et regroupe pour vous toutes les destinations accessibles depuis n'importe quelle gare TGV.
             </p>
           </div>
 
