@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import date as Date
 from typing import DefaultDict, Iterable, Optional, Sequence
 
 from app.domain.stations import (
@@ -17,6 +18,7 @@ MIN_CONNECT_SAME_METROPOLIS = 50
 MAX_CONNECT_MINUTES = 6 * 60
 MAX_CONNECTIONS = 2
 DEFAULT_MAX_CONNECTIONS = 1
+MINUTES_PER_DAY = 24 * 60
 
 HubDateKey = tuple[str, str]
 
@@ -142,11 +144,72 @@ def time_to_minutes(hhmm: str) -> int:
 
 
 def minutes_between_arrival_and_departure(heure_arrivee: str, heure_depart: str) -> int:
+    """Écart entre deux heures sur 24 h (sans date) — passe minuit si besoin."""
     arr = time_to_minutes(heure_arrivee)
     dep = time_to_minutes(heure_depart)
     if dep >= arr:
         return dep - arr
     return (24 * 60 - arr) + dep
+
+
+# --- Horodatages absolus -----------------------------------------------------
+# Le flux SNCF date chaque train par son jour de DÉPART : un train de nuit
+# parti le 12 à 22:00 et arrivé à 07:30 arrive en réalité le 13. Les calculs
+# de correspondance se font donc en minutes absolues (jour + heure), jamais en
+# comparant des heures « nues » sur une même date.
+
+
+def _day_ordinal(iso_date: str) -> Optional[int]:
+    try:
+        return Date.fromisoformat(iso_date).toordinal()
+    except (TypeError, ValueError):
+        return None
+
+
+def segment_duration_minutes(leg: TripSegment) -> int:
+    """Durée du trajet ; arrivée < départ ⇒ arrivée le lendemain."""
+    return minutes_between_arrival_and_departure(leg.heure_depart, leg.heure_arrivee)
+
+
+def departure_abs_minutes(leg: TripSegment) -> Optional[int]:
+    day = _day_ordinal(leg.date)
+    if day is None:
+        return None
+    return day * MINUTES_PER_DAY + time_to_minutes(leg.heure_depart)
+
+
+def arrival_abs_minutes(leg: TripSegment) -> Optional[int]:
+    dep = departure_abs_minutes(leg)
+    if dep is None:
+        return None
+    return dep + segment_duration_minutes(leg)
+
+
+def connection_wait_minutes(leg1: TripSegment, leg2: TripSegment) -> Optional[int]:
+    """Attente réelle entre l'arrivée de leg1 et le départ de leg2 (négative si leg2 part avant)."""
+    arr = arrival_abs_minutes(leg1)
+    dep = departure_abs_minutes(leg2)
+    if arr is None or dep is None:
+        return None
+    return dep - arr
+
+
+def candidate_connection_dates(
+    leg: TripSegment,
+    *,
+    max_connect_minutes: int = MAX_CONNECT_MINUTES,
+) -> tuple[str, ...]:
+    """Dates (jour de départ SNCF) auxquelles un train de correspondance peut partir.
+
+    Le jour d'arrivée réel de `leg`, plus le lendemain si la fenêtre
+    d'attente maximale franchit minuit.
+    """
+    arr = arrival_abs_minutes(leg)
+    if arr is None:
+        return ()
+    first_day = arr // MINUTES_PER_DAY
+    last_day = (arr + max_connect_minutes) // MINUTES_PER_DAY
+    return tuple(Date.fromordinal(d).isoformat() for d in range(first_day, last_day + 1))
 
 
 def required_connection_minutes(
@@ -168,8 +231,7 @@ def required_connection_minutes(
 
 
 def connectable_hub(leg1: TripSegment, leg2: TripSegment) -> Optional[str]:
-    if leg1.date != leg2.date:
-        return None
+    """Métropole de correspondance commune, ou None. Le timing est vérifié à part."""
     hub = leg1.destination_metropolis
     if not hub or hub != leg2.origine_metropolis:
         return None
@@ -215,7 +277,9 @@ def connection_wait_is_valid(
     )
     if min_wait is None:
         return False
-    wait = minutes_between_arrival_and_departure(leg1.heure_arrivee, leg2.heure_depart)
+    wait = connection_wait_minutes(leg1, leg2)
+    if wait is None:
+        return False
     return min_wait <= wait <= max_connect_minutes
 
 
@@ -245,11 +309,11 @@ def build_departures_from_hub_index(
 
 
 def _journey_from_legs(legs: tuple[TripSegment, ...]) -> ConnectedJourney:
-    wait = sum(
-        minutes_between_arrival_and_departure(legs[i].heure_arrivee, legs[i + 1].heure_depart)
-        for i in range(len(legs) - 1)
-    )
-    total = minutes_between_arrival_and_departure(legs[0].heure_depart, legs[-1].heure_arrivee)
+    # Les legs ont été validés par segments_connect : les horodatages existent.
+    wait = sum(connection_wait_minutes(legs[i], legs[i + 1]) or 0 for i in range(len(legs) - 1))
+    start = departure_abs_minutes(legs[0])
+    end = arrival_abs_minutes(legs[-1])
+    total = end - start if start is not None and end is not None else 0
     return ConnectedJourney(
         legs=legs,
         connection_minutes=wait,
@@ -272,19 +336,20 @@ def _find_two_leg_journeys(
             continue
         hub = leg1.destination_metropolis
         assert hub is not None
-        for leg2 in index.get((leg1.date, hub), ()):
-            if not is_viable_hub_departure_leg(leg2):
-                continue
-            if not segments_connect(leg1, leg2, max_connect_minutes=max_connect_minutes):
-                continue
-            if not is_meaningful_journey(leg1, leg2):
-                continue
-            journey = _journey_from_legs((leg1, leg2))
-            fp = journey.fingerprint
-            if fp in seen:
-                continue
-            seen.add(fp)
-            out.append(journey)
+        for day in candidate_connection_dates(leg1, max_connect_minutes=max_connect_minutes):
+            for leg2 in index.get((day, hub), ()):
+                if not is_viable_hub_departure_leg(leg2):
+                    continue
+                if not segments_connect(leg1, leg2, max_connect_minutes=max_connect_minutes):
+                    continue
+                if not is_meaningful_journey(leg1, leg2):
+                    continue
+                journey = _journey_from_legs((leg1, leg2))
+                fp = journey.fingerprint
+                if fp in seen:
+                    continue
+                seen.add(fp)
+                out.append(journey)
     return out
 
 
@@ -301,22 +366,23 @@ def _extend_to_three_legs(
         hub = leg2.destination_metropolis
         if not hub:
             continue
-        for leg3 in index.get((leg2.date, hub), ()):
-            if not is_viable_hub_departure_leg(leg3):
-                continue
-            if not segments_connect(leg2, leg3, max_connect_minutes=max_connect_minutes):
-                continue
-            if not is_meaningful_journey(journey.legs[0], leg3):
-                continue
-            if leg3.segment_id in {leg.segment_id for leg in journey.legs}:
-                continue
-            legs3 = (*journey.legs, leg3)
-            j3 = _journey_from_legs(legs3)
-            fp = j3.fingerprint
-            if fp in seen:
-                continue
-            seen.add(fp)
-            out.append(j3)
+        for day in candidate_connection_dates(leg2, max_connect_minutes=max_connect_minutes):
+            for leg3 in index.get((day, hub), ()):
+                if not is_viable_hub_departure_leg(leg3):
+                    continue
+                if not segments_connect(leg2, leg3, max_connect_minutes=max_connect_minutes):
+                    continue
+                if not is_meaningful_journey(journey.legs[0], leg3):
+                    continue
+                if leg3.segment_id in {leg.segment_id for leg in journey.legs}:
+                    continue
+                legs3 = (*journey.legs, leg3)
+                j3 = _journey_from_legs(legs3)
+                fp = j3.fingerprint
+                if fp in seen:
+                    continue
+                seen.add(fp)
+                out.append(j3)
     return out
 
 
@@ -392,8 +458,9 @@ def hub_date_keys_from_outbound(
     for leg in segments:
         if not is_viable_first_leg(leg, origin_metropolis=origin_metropolis):
             continue
-        if leg.date and leg.destination_metropolis:
-            keys.add((leg.date, leg.destination_metropolis))
+        if leg.destination_metropolis:
+            for day in candidate_connection_dates(leg):
+                keys.add((day, leg.destination_metropolis))
     return frozenset(keys)
 
 
@@ -405,8 +472,9 @@ def hub_date_keys_from_two_leg_journeys(
         if j.connection_count < 1:
             continue
         last = j.legs[-1]
-        if last.date and last.destination_metropolis and is_hub_metropolis(last.destination_metropolis):
-            keys.add((last.date, last.destination_metropolis))
+        if last.destination_metropolis and is_hub_metropolis(last.destination_metropolis):
+            for day in candidate_connection_dates(last):
+                keys.add((day, last.destination_metropolis))
     return frozenset(keys)
 
 

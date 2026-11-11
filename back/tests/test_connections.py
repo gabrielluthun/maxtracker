@@ -4,8 +4,11 @@ import unittest
 from app.domain.connections import (
     TripSegment,
     build_departures_from_hub_index,
+    candidate_connection_dates,
     connectable_hub,
+    connection_wait_minutes,
     find_all_connected_journeys,
+    hub_date_keys_from_outbound,
     hubs_reachable_as_first_leg,
     is_meaningful_journey,
     minutes_between_arrival_and_departure,
@@ -228,3 +231,117 @@ class TestIndexAndHelpers(unittest.TestCase):
         }
         s = segment_from_trip_doc(doc)
         self.assertEqual(s.destination_metropolis, "Paris")
+
+
+class TestOvernightAndMidnight(unittest.TestCase):
+    """Le flux SNCF date un train par son jour de départ, même s'il arrive le lendemain."""
+
+    def setUp(self):
+        # Paris → Toulouse de nuit : part le 12 à 22:00, arrive le 13 à 07:30.
+        self.night = _seg(
+            train_no="3753",
+            date="2026-11-12",
+            origine="PARIS AUSTERLITZ",
+            destination="TOULOUSE MATABIAU",
+            heure_depart="22:00",
+            heure_arrivee="07:30",
+            origine_metropolis="Paris",
+            destination_metropolis="Toulouse",
+            train_type="INTERCITES_NUIT",
+        )
+
+    def _toulouse_bordeaux(self, date, heure_depart):
+        return _seg(
+            train_no="8500",
+            date=date,
+            origine="TOULOUSE MATABIAU",
+            destination="BORDEAUX ST JEAN",
+            heure_depart=heure_depart,
+            heure_arrivee="10:30" if heure_depart < "10:30" else "23:59",
+            origine_metropolis="Toulouse",
+            destination_metropolis="Bordeaux",
+        )
+
+    def test_night_train_rejects_connection_departing_before_it(self):
+        # Le TGV du 12 à 08:30 part 13 h 30 AVANT le train de nuit.
+        before = self._toulouse_bordeaux("2026-11-12", "08:30")
+        self.assertFalse(segments_connect(self.night, before))
+        journeys = find_all_connected_journeys(
+            [self.night], [before], origin_metropolis="Paris", max_connections=1
+        )
+        self.assertEqual(journeys, [])
+
+    def test_night_train_connects_next_morning(self):
+        next_morning = self._toulouse_bordeaux("2026-11-13", "08:30")
+        journeys = find_all_connected_journeys(
+            [self.night], [next_morning], origin_metropolis="Paris", max_connections=1
+        )
+        self.assertEqual(len(journeys), 1)
+        self.assertEqual(journeys[0].connection_minutes, 60)
+        # 22:00 le 12 → 10:30 le 13
+        self.assertEqual(journeys[0].total_duration_minutes, 12 * 60 + 30)
+
+    def test_candidate_dates_follow_real_arrival_day(self):
+        self.assertEqual(candidate_connection_dates(self.night), ("2026-11-13",))
+
+    def test_late_arrival_can_connect_after_midnight_next_day(self):
+        leg1 = _seg(
+            date="2026-11-12",
+            heure_depart="21:00",
+            heure_arrivee="23:30",
+            origine_metropolis="Lille",
+            destination_metropolis="Paris",
+        )
+        after_midnight = _seg(
+            train_no="2",
+            date="2026-11-13",
+            origine="PARIS (intramuros)",
+            heure_depart="00:30",
+            heure_arrivee="06:00",
+            origine_metropolis="Paris",
+            destination_metropolis="Nice",
+        )
+        self.assertEqual(candidate_connection_dates(leg1), ("2026-11-12", "2026-11-13"))
+        self.assertTrue(segments_connect(leg1, after_midnight))
+        self.assertEqual(connection_wait_minutes(leg1, after_midnight), 60)
+
+    def test_same_date_early_departure_is_not_wrapped_to_next_day(self):
+        # Ancien bug : 23:30 → 00:20 « même date » était compté comme 50 min d'attente.
+        leg1 = _seg(
+            date="2026-11-12",
+            heure_depart="21:00",
+            heure_arrivee="23:30",
+            origine_metropolis="Lille",
+            destination_metropolis="Paris",
+        )
+        same_day_early = _seg(
+            train_no="2",
+            date="2026-11-12",
+            origine="PARIS (intramuros)",
+            heure_depart="00:20",
+            heure_arrivee="06:00",
+            origine_metropolis="Paris",
+            destination_metropolis="Nice",
+        )
+        self.assertFalse(segments_connect(leg1, same_day_early))
+
+    def test_hub_date_keys_use_arrival_day(self):
+        doc = {
+            "train_no": "3753",
+            "date": "2026-11-12",
+            "origine": "PARIS AUSTERLITZ",
+            "destination": "TOULOUSE MATABIAU",
+            "heure_depart": "22:00",
+            "heure_arrivee": "07:30",
+            "origine_metropolis": "Paris",
+            "destination_metropolis": "Toulouse",
+        }
+        keys = hub_date_keys_from_outbound([doc], origin_metropolis="Paris")
+        self.assertEqual(keys, frozenset({("2026-11-13", "Toulouse")}))
+
+    def test_missing_date_never_connects(self):
+        leg1 = _seg(date="", origine_metropolis="Lille", destination_metropolis="Paris")
+        leg2 = _seg(date="", origine_metropolis="Paris", destination_metropolis="Lyon",
+                    heure_depart="10:00")
+        self.assertFalse(segments_connect(leg1, leg2))
+        self.assertEqual(candidate_connection_dates(leg1), ())
