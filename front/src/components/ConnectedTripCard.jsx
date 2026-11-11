@@ -1,6 +1,7 @@
 import { memo, useId, useState } from "react";
 import { ArrowRight, ChevronDown, ChevronUp, GitBranch, Zap } from "lucide-react";
 import TrainCard from "@/components/TrainCard";
+import { isImminentDeparture } from "@/lib/tripTime";
 import { journeyKey, tripKey } from "@/lib/tripKeys";
 import { cn } from "@/lib/utils";
 
@@ -10,22 +11,13 @@ function fmtHHmm(s) {
   return (s || "").slice(0, 5);
 }
 
-function isImminent(date, heure) {
-  try {
-    const dt = new Date(`${date}T${heure}:00`);
-    const diff = dt.getTime() - Date.now();
-    return diff > 0 && diff < 4 * 3600 * 1000;
-  } catch {
-    return false;
-  }
-}
 
 function ConnectedTripCard({ connected, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   // Identifiant DOM valide (l'ancien id de parcours contenait espaces et « > »).
   const legsId = useId();
   const key = journeyKey(connected);
-  const imminent = isImminent(connected.date, connected.heure_depart);
+  const imminent = isImminentDeparture(connected.date, connected.heure_depart);
   const waitH = Math.floor(connected.connection_minutes / 60);
   const waitM = connected.connection_minutes % 60;
   const waitLabel =

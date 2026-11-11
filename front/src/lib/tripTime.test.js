@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { calendarDays, mondayFirstWeekdayIndex } from "./tripTime";
+import {
+  calendarDays,
+  isImminentDeparture,
+  minutesUntilDeparture,
+  mondayFirstWeekdayIndex,
+} from "./tripTime";
 
 describe("calendarDays", () => {
   it("starts on the given Paris date, not the previous UTC day", () => {
@@ -25,5 +30,21 @@ describe("mondayFirstWeekdayIndex", () => {
     expect(mondayFirstWeekdayIndex("2026-11-09")).toBe(0); // lundi
     expect(mondayFirstWeekdayIndex("2026-11-11")).toBe(2); // mercredi
     expect(mondayFirstWeekdayIndex("2026-11-15")).toBe(6); // dimanche
+  });
+});
+
+describe("isImminentDeparture", () => {
+  const lateEvening = { today: "2026-11-11", curTime: "22:30" };
+
+  it("counts minutes in Paris time across midnight", () => {
+    expect(minutesUntilDeparture("2026-11-12", "01:00", lateEvening)).toBe(150);
+    expect(minutesUntilDeparture("2026-11-11", "22:00", lateEvening)).toBe(-30);
+  });
+
+  it("flags departures within the next 4 hours only", () => {
+    expect(isImminentDeparture("2026-11-12", "01:00", lateEvening)).toBe(true);
+    expect(isImminentDeparture("2026-11-11", "22:00", lateEvening)).toBe(false); // parti
+    expect(isImminentDeparture("2026-11-12", "02:30", lateEvening)).toBe(false); // 4 h pile
+    expect(isImminentDeparture("2026-11-13", "08:00", lateEvening)).toBe(false);
   });
 });
