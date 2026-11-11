@@ -1,6 +1,7 @@
 import { memo, useId, useState } from "react";
 import { ArrowRight, ChevronDown, ChevronUp, GitBranch, Zap } from "lucide-react";
 import TrainCard from "@/components/TrainCard";
+import NewBadge from "@/components/NewBadge";
 import NextDayMark from "@/components/NextDayMark";
 import { arrivalDayOffset, isImminentDeparture } from "@/lib/tripTime";
 import { journeyKey, tripKey } from "@/lib/tripKeys";
@@ -56,6 +57,7 @@ function ConnectedTripCard({ connected, defaultOpen = false }) {
               <Zap className="h-3 w-3" strokeWidth={2.5} /> Imminent
             </span>
           )}
+          {connected.is_new && <NewBadge />}
         </div>
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <div>

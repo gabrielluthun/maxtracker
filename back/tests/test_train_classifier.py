@@ -76,6 +76,7 @@ async def test_sync_keeps_every_eligible_train_but_same_city_trips():
     ]
     trips = MagicMock()
     trips.replace_all = AsyncMock()
+    trips.first_seen_by_id = AsyncMock(return_value={})
     trips.cleanup_today_before = AsyncMock()
     trips.count = AsyncMock(return_value=3)
     sync = MagicMock()

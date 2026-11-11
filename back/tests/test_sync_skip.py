@@ -10,6 +10,7 @@ def _service(*, sncf_updated, previous, version=PIPELINE_VERSION):
     settings = MagicMock()
     trips = MagicMock()
     trips.replace_all = AsyncMock()
+    trips.first_seen_by_id = AsyncMock(return_value={})
     trips.cleanup_today_before = AsyncMock()
     trips.count = AsyncMock(return_value=10)
     sync = MagicMock()

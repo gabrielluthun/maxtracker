@@ -176,6 +176,7 @@ class SearchService:
             ),
             destination_metropolis=t.get("destination_metropolis"),
             departure_datetime=t["departure_datetime"],
+            is_new=bool(t.get("is_new")),
         )
 
     def _build_destination_groups(

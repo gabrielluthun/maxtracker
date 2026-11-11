@@ -11,6 +11,7 @@ import {
 export const DEFAULT_FILTERS = Object.freeze({
   departureTodayOnly: false,
   weekendOnly: false,
+  newOnly: false, // trajets apparus dans les dernières 24 h de publications SNCF
   timeSlots: Object.freeze({ morning: true, afternoon: true, evening: true }),
   showInoui: true,
   showIntercites: true,
@@ -69,6 +70,7 @@ export function parseSearchState(search) {
   const duration = Number(params.get("duree"));
   if (DURATIONS.includes(duration)) filters.maxDurationMinutes = duration;
   if (params.get("aujourdhui") === "1") filters.departureTodayOnly = true;
+  if (params.get("nouveau") === "1") filters.newOnly = true;
   if (params.get("weekend") === "1") filters.weekendOnly = true;
   if (params.has("creneaux")) {
     const chosen = new Set(params.get("creneaux").split(","));
@@ -103,6 +105,7 @@ export function serializeSearchState({ station, filters, destQuery = "", tab = "
   if (f.dateHorizonDays !== DEFAULT_DATE_HORIZON_DAYS) params.set("horizon", String(f.dateHorizonDays));
   if (f.maxDurationMinutes != null) params.set("duree", String(f.maxDurationMinutes));
   if (f.departureTodayOnly) params.set("aujourdhui", "1");
+  if (f.newOnly) params.set("nouveau", "1");
   if (f.weekendOnly) params.set("weekend", "1");
   if (SLOTS.some(([, key]) => !f.timeSlots[key])) {
     params.set("creneaux", SLOTS.filter(([, key]) => f.timeSlots[key]).map(([name]) => name).join(","));

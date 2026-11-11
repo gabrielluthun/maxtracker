@@ -23,6 +23,8 @@ class TripOut(BaseModel):
     sncf_connect_url: str
     destination_metropolis: Optional[str] = None
     departure_datetime: str
+    # Apparu dans les dernières 24 h de publications SNCF.
+    is_new: bool = False
 
 
 class ConnectedTripOut(BaseModel):
@@ -38,6 +40,8 @@ class ConnectedTripOut(BaseModel):
     destination_metropolis: Optional[str] = None
     legs: List[TripOut]
     price_checked_at: Optional[str] = None
+    # Au moins une étape est nouvelle : le parcours vient de devenir possible.
+    is_new: bool = False
 
 
 class DestinationGroup(BaseModel):

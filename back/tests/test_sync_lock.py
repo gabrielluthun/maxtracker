@@ -20,6 +20,7 @@ class _FakeClock:
 def _service(*, fetch_export=None, cooldown=180, clock=None):
     trips = MagicMock()
     trips.replace_all = AsyncMock()
+    trips.first_seen_by_id = AsyncMock(return_value={})
     trips.cleanup_today_before = AsyncMock()
     trips.count = AsyncMock(return_value=10)
     sync = MagicMock()
