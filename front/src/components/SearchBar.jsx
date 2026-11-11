@@ -186,7 +186,14 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
                     data-testid={`suggestion-${i}`}
                   >
                     <MapPin className="h-4 w-4 text-slate-400" strokeWidth={2} aria-hidden="true" />
-                    <span className="flex-1 text-slate-800">{s.name}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-slate-800">{s.name}</span>
+                      {s.hint && (
+                        <span className="block text-xs text-slate-500" data-testid={`suggestion-hint-${i}`}>
+                          {s.hint}
+                        </span>
+                      )}
+                    </span>
                     {s.is_metropolis && (
                       <span className="text-[10px] uppercase tracking-wider bg-[#0A2540] text-white px-2 py-0.5 rounded-full font-semibold">Métropole</span>
                     )}
