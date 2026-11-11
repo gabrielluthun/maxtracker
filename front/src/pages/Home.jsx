@@ -10,7 +10,7 @@ import {
   useTransition,
 } from "react";
 import { toast } from "sonner";
-import { List, CalendarDays, BarChart3, Sparkles, AlertCircle, Inbox, X } from "lucide-react";
+import { List, CalendarDays, BarChart3, Sparkles, AlertCircle, Inbox, Search, X } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import FiltersPanel from "@/components/FiltersPanel";
 import MobileFiltersSheet from "@/components/MobileFiltersSheet";
@@ -30,6 +30,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSearchTrips } from "@/hooks/useSearchTrips";
 import { getHidden, unhideDestination, hideDestination } from "@/lib/storage";
+import { filterGroupsByDestination } from "@/lib/destinationSearch";
 import { cn } from "@/lib/utils";
 
 // Recharts (~la moitié du JavaScript de l'app) n'est chargé qu'à l'ouverture de l'onglet.
@@ -63,6 +64,8 @@ export default function Home({ syncInfo, registerRerunSearch }) {
   const [animateResults, setAnimateResults] = useState(false);
   const [hidden, setHidden] = useState(getHidden());
   const [tab, setTab] = useState("list");
+  const [destQuery, setDestQuery] = useState("");
+  const deferredDestQuery = useDeferredValue(destQuery);
   const [mobileVisibleDestinations, setMobileVisibleDestinations] = useState(MOBILE_INITIAL_DESTINATIONS);
 
   // Les correspondances (~85 % du volume) ne sont chargées que si le filtre les affiche.
@@ -98,6 +101,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
       setOrigin(station);
       setSearchOrigin(station.raw);
       setAnimateResults(false);
+      setDestQuery(""); // nouvelle gare : la recherche de destination repart de zéro
     });
   }, []);
 
@@ -149,9 +153,19 @@ export default function Home({ syncInfo, registerRerunSearch }) {
     return { groups, totalTrips: total };
   }, [preparedGroups, deferredFilters, hidden]);
 
+  // Recherche « Où voulez-vous aller ? » appliquée après les filtres.
+  const visibleGroups = useMemo(
+    () => filterGroupsByDestination(filteredGroups, deferredDestQuery),
+    [filteredGroups, deferredDestQuery]
+  );
+  const visibleTrips = useMemo(
+    () => (visibleGroups === filteredGroups ? totalTrips : visibleGroups.reduce((n, g) => n + g.trip_count, 0)),
+    [visibleGroups, filteredGroups, totalTrips]
+  );
+
   const chartTrips = useMemo(
-    () => (tab === "chart" ? departuresForCharts(filteredGroups) : []),
-    [filteredGroups, tab]
+    () => (tab === "chart" ? departuresForCharts(visibleGroups) : []),
+    [visibleGroups, tab]
   );
 
   // Le calendrier montre tous les jours de l'horizon, même si un jour est sélectionné.
@@ -162,8 +176,8 @@ export default function Home({ syncInfo, registerRerunSearch }) {
       { ...deferredFilters, selectedDate: null },
       hidden
     );
-    return departuresForCharts(groups);
-  }, [preparedGroups, deferredFilters, hidden, tab]);
+    return departuresForCharts(filterGroupsByDestination(groups, deferredDestQuery));
+  }, [preparedGroups, deferredFilters, hidden, tab, deferredDestQuery]);
 
   const onSelectDay = useCallback(
     (date) => {
@@ -176,7 +190,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
 
   useEffect(() => {
     setMobileVisibleDestinations(MOBILE_INITIAL_DESTINATIONS);
-  }, [data?.origin, filteredGroups.length]);
+  }, [data?.origin, visibleGroups.length]);
 
   const onHide = useCallback((key) => {
     hideDestination(key);
@@ -274,7 +288,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                 onChange={onFiltersChange}
                 hiddenCount={hidden.length}
                 onResetHidden={onResetHidden}
-                totalDestinations={filteredGroups.length}
+                totalDestinations={visibleGroups.length}
               />
             </div>
 
@@ -286,8 +300,8 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                       Au départ de <span className="text-[#10B981]">{data.origin}</span>
                     </h2>
                     <div className="text-sm text-slate-500 mt-0.5">
-                      <span className="font-mono">{totalTrips}</span> trajet{totalTrips > 1 ? "s" : ""} ·{" "}
-                      <span className="font-mono">{filteredGroups.length}</span> destination{filteredGroups.length > 1 ? "s" : ""}
+                      <span className="font-mono">{visibleTrips}</span> trajet{visibleTrips > 1 ? "s" : ""} ·{" "}
+                      <span className="font-mono">{visibleGroups.length}</span> destination{visibleGroups.length > 1 ? "s" : ""}
                       {refreshing && (
                         <span className="ml-2 text-[#10B981]">
                           · {loadingConnections ? "Chargement des correspondances…" : "Mise à jour…"}
@@ -302,8 +316,36 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                   </TabsList>
                 </div>
 
+                <div className="mb-4 flex flex-wrap items-center gap-3">
+                  <div className="relative w-full sm:max-w-xs">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" aria-hidden="true" />
+                    <input
+                      type="text"
+                      inputMode="search"
+                      enterKeyHint="search"
+                      value={destQuery}
+                      onChange={(e) => setDestQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === "Escape" && setDestQuery("")}
+                      placeholder="Où voulez-vous aller ?"
+                      aria-label="Filtrer les destinations"
+                      autoComplete="off"
+                      className="w-full h-10 pl-9 pr-9 rounded-xl bg-white border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#0A2540] focus:ring-2 focus:ring-[#0A2540]/10 dark:text-slate-100 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/20"
+                      data-testid="destination-search"
+                    />
+                    {destQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setDestQuery("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                        aria-label="Effacer la recherche de destination"
+                        data-testid="destination-search-clear"
+                      >
+                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
                 {filters.selectedDate && (
-                  <div className="mb-4" data-testid="day-filter-chip">
+                  <div data-testid="day-filter-chip">
                     <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold filter-chip-active">
                       <CalendarDays className="h-4 w-4" aria-hidden="true" />
                       {formatTripDayLabel(filters.selectedDate)}
@@ -320,32 +362,46 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                     </span>
                   </div>
                 )}
+                </div>
 
                 <TabsContent value="list">
-                  {filteredGroups.length === 0 ? (
+                  {visibleGroups.length === 0 ? (
                     <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center text-slate-500" data-testid="no-results-after-filter">
-                      Aucun résultat avec ces filtres.
+                      {filteredGroups.length > 0 && deferredDestQuery.trim() ? (
+                        <>
+                          Aucune destination ne correspond à « {deferredDestQuery.trim()} ».{" "}
+                          <button
+                            type="button"
+                            onClick={() => setDestQuery("")}
+                            className="font-semibold text-[#0A2540] underline dark:text-emerald-300"
+                          >
+                            Effacer la recherche
+                          </button>
+                        </>
+                      ) : (
+                        "Aucun résultat avec ces filtres."
+                      )}
                     </div>
                   ) : (
                     <>
                       <div className={cn("hidden lg:block space-y-4", animateResults && "stagger")}>
-                        {filteredGroups.map((g) => (
+                        {visibleGroups.map((g) => (
                           <DestinationGroup key={g.destination_city} group={g} onHide={onHide} />
                         ))}
                       </div>
 
                       <div className={cn("lg:hidden space-y-4", animateResults && "stagger")}>
-                        {filteredGroups.slice(0, mobileVisibleDestinations).map((g) => (
+                        {visibleGroups.slice(0, mobileVisibleDestinations).map((g) => (
                           <DestinationGroup key={g.destination_city} group={g} onHide={onHide} />
                         ))}
-                        {filteredGroups.length > mobileVisibleDestinations && (
+                        {visibleGroups.length > mobileVisibleDestinations && (
                           <button
                             type="button"
                             onClick={() => setMobileVisibleDestinations((prev) => prev + MOBILE_DESTINATIONS_STEP)}
                             className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#0A2540] hover:bg-slate-50 text-sm font-semibold text-slate-700 transition-colors"
                             data-testid="mobile-load-more-destinations"
                           >
-                            Afficher {MOBILE_DESTINATIONS_STEP} destinations de plus ({filteredGroups.length - mobileVisibleDestinations} restantes)
+                            Afficher {MOBILE_DESTINATIONS_STEP} destinations de plus ({visibleGroups.length - mobileVisibleDestinations} restantes)
                           </button>
                         )}
                       </div>
@@ -382,7 +438,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
             onFiltersChange={onFiltersChange}
             hiddenCount={hidden.length}
             onResetHidden={onResetHidden}
-            totalDestinations={filteredGroups.length}
+            totalDestinations={visibleGroups.length}
           />
         )}
 
