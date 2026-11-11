@@ -16,6 +16,7 @@ import FiltersPanel from "@/components/FiltersPanel";
 import MobileFiltersSheet from "@/components/MobileFiltersSheet";
 import {
   DEFAULT_DATE_HORIZON_DAYS,
+  countNewItems,
   departuresForCharts,
   enrichSearchGroups,
   filterPreparedGroups,
@@ -26,6 +27,7 @@ import DestinationGroupSkeleton from "@/components/DestinationGroupSkeleton";
 import CalendarView from "@/components/CalendarView";
 import Disclaimer from "@/components/Disclaimer";
 import WelcomeModal from "@/components/WelcomeModal";
+import { NEW_TRIP_TITLE } from "@/components/NewBadge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSearchTrips } from "@/hooks/useSearchTrips";
@@ -214,6 +216,11 @@ export default function Home({ syncInfo, registerRerunSearch }) {
     [visibleGroups, filteredGroups, totalTrips]
   );
 
+  const visibleNew = useMemo(
+    () => visibleGroups.reduce((n, g) => n + countNewItems(g.trips, g.connected_trips), 0),
+    [visibleGroups]
+  );
+
   const chartTrips = useMemo(
     () => (tab === "chart" ? departuresForCharts(visibleGroups) : []),
     [visibleGroups, tab]
@@ -345,6 +352,14 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                     <div className="text-sm text-slate-500 mt-0.5">
                       <span className="font-mono">{visibleTrips}</span> trajet{visibleTrips > 1 ? "s" : ""} ·{" "}
                       <span className="font-mono">{visibleGroups.length}</span> destination{visibleGroups.length > 1 ? "s" : ""}
+                      {visibleNew > 0 && (
+                        <>
+                          {" · "}
+                          <span className="font-semibold text-violet-700 dark:text-violet-300" data-testid="new-count" title={NEW_TRIP_TITLE}>
+                            <span className="font-mono">{visibleNew}</span> nouveau{visibleNew > 1 ? "x" : ""}
+                          </span>
+                        </>
+                      )}
                       {refreshing && (
                         <span className="ml-2 text-[#10B981]">
                           · {loadingConnections ? "Chargement des correspondances…" : "Mise à jour…"}

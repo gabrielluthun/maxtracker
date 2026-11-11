@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   arrivalDayOffset,
+  countNewItems,
   createFilterContext,
   enrichSearchGroups,
   filterPreparedGroups,
@@ -93,5 +94,41 @@ describe("selectedDate filter", () => {
 
   it("shows every day when no day is selected", () => {
     expect(filterPreparedGroups(groups, filters, []).totalTrips).toBe(3);
+  });
+});
+
+describe("new trips", () => {
+  const filters = {
+    departureTodayOnly: false,
+    weekendOnly: false,
+    newOnly: false,
+    timeSlots: { morning: true, afternoon: true, evening: true },
+    showInoui: true,
+    showIntercites: true,
+    showIntercitesNuit: true,
+    maxConnections: 1,
+    maxDurationMinutes: null,
+    dateHorizonDays: 30,
+    selectedDate: null,
+  };
+  const { today } = createFilterContext(filters);
+  const [y, m, d] = today.split("-").map(Number);
+  const tomorrow = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+  const trip = (isNew) => ({ date: tomorrow, heure_depart: "10:00", heure_arrivee: "12:00", train_type: "TGV_INOUI", ...(isNew ? { is_new: true } : {}) });
+  const journey = (isNew) => ({ ...trip(isNew), legs: [trip(false), trip(isNew)] });
+  const groups = enrichSearchGroups([
+    { destination_city: "Lyon", trips: [trip(true), trip(false)], connected_trips: [journey(true)] },
+    { destination_city: "Nice", trips: [trip(false)], connected_trips: [journey(false)] },
+  ]);
+
+  it("counts new direct trips and journeys", () => {
+    expect(countNewItems(groups[0].trips, groups[0].connected_trips)).toBe(2);
+    expect(countNewItems(groups[1].trips, groups[1].connected_trips)).toBe(0);
+  });
+
+  it("keeps only new items with the newOnly filter", () => {
+    const { groups: out, totalTrips } = filterPreparedGroups(groups, { ...filters, newOnly: true }, []);
+    expect(out.map((g) => g.destination_city)).toEqual(["Lyon"]);
+    expect(totalTrips).toBe(2);
   });
 });

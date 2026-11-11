@@ -36,6 +36,7 @@ describe("serializeSearchState", () => {
       maxDurationMinutes: 180,
       departureTodayOnly: true,
       weekendOnly: true,
+      newOnly: true,
       timeSlots: { afternoon: false },
       showIntercitesNuit: false,
       selectedDate: "2026-11-14",
@@ -43,7 +44,7 @@ describe("serializeSearchState", () => {
     const qs = serializeSearchState({ station: paris, filters, destQuery: " bordeaux ", tab: "calendar" });
     expect(qs).toBe(
       "?gare=Paris&dest=bordeaux&vue=calendrier&corresp=1&horizon=7&duree=180" +
-        "&aujourdhui=1&weekend=1&creneaux=matin%2Csoir&trains=inoui%2Cic&jour=2026-11-14"
+        "&aujourdhui=1&nouveau=1&weekend=1&creneaux=matin%2Csoir&trains=inoui%2Cic&jour=2026-11-14"
     );
   });
 });

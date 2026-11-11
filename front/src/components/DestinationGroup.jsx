@@ -2,10 +2,12 @@ import { memo, useId, useState } from "react";
 import { ChevronDown, ChevronUp, MapPin, EyeOff } from "lucide-react";
 import TrainCard from "@/components/TrainCard";
 import ConnectedTripCard from "@/components/ConnectedTripCard";
+import NewBadge from "@/components/NewBadge";
 import {
   formatTripDayLabel,
   getParisClock,
   groupDestinationItemsByDate,
+  countNewItems,
   groupHasDepartureToday,
 } from "@/lib/tripTime";
 import { journeyKey, tripKey } from "@/lib/tripKeys";
@@ -37,6 +39,7 @@ function DestinationGroup({ group, onHide }) {
   const connected = group.connected_trips || [];
   const today = getParisClock().today;
   const hasTodayDeparture = groupHasDepartureToday(group.trips, connected);
+  const newCount = countNewItems(group.trips, connected);
   const daySections = open ? groupDestinationItemsByDate(group.trips, connected) : [];
 
   return (
@@ -72,6 +75,7 @@ function DestinationGroup({ group, onHide }) {
                     Départ possible aujourd&apos;hui
                   </span>
                 )}
+                {newCount > 0 && <NewBadge count={newCount} className="rounded-full py-0.5" />}
               </span>
               <span className="block text-xs text-slate-500 dark:text-slate-400 truncate">
                 {group.destinations.length > 1 ? `${group.destinations.length} gares · ` : ""}

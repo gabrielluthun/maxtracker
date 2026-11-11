@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { ExternalLink, Train, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import NewBadge from "@/components/NewBadge";
 import NextDayMark from "@/components/NextDayMark";
 import {
   arrivalDayOffset,
@@ -103,6 +104,7 @@ function TrainCard({ trip, label }) {
                 <Zap className="h-3 w-3" strokeWidth={2.5} /> Imminent
               </span>
             )}
+            {trip.is_new && <NewBadge />}
           </div>
           <a
             data-testid="sncf-connect-link"

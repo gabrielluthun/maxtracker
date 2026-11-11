@@ -160,6 +160,14 @@ function enrichConnectedTrip(ct, clock) {
   };
 }
 
+/** Trajets et parcours « nouveaux » (apparus dans les dernières 24 h de publications SNCF). */
+export function countNewItems(trips = [], connectedTrips = []) {
+  let n = 0;
+  for (const t of trips) if (t.is_new) n += 1;
+  for (const c of connectedTrips) if (c.is_new) n += 1;
+  return n;
+}
+
 /** True si le groupe contient au moins un départ non passé aujourd'hui (trajets déjà filtrés). */
 export function groupHasDepartureToday(trips, connectedTrips = []) {
   return trips.some((t) => t._today) || connectedTrips.some((c) => c._today);
@@ -188,6 +196,7 @@ function matchesCommonFiltersCtx(item, ctx) {
   if (horizonLast != null && (item.date < today || item.date > horizonLast)) return false;
   if (filters.selectedDate && item.date !== filters.selectedDate) return false;
   if (filters.departureTodayOnly && !item._today) return false;
+  if (filters.newOnly && !item.is_new) return false;
   if (filters.weekendOnly && !item._weekend) return false;
   if (!filters.timeSlots[item._slot]) return false;
   if (maxDuration != null && item._durationMinutes != null && item._durationMinutes > maxDuration) {
