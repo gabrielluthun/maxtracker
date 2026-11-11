@@ -100,7 +100,8 @@ def create_app() -> FastAPI:
     app.include_router(api_router)
     app.add_middleware(
         CORSMiddleware,
-        allow_credentials=True,
+        # Aucune requête du front n'envoie de cookie : pas de CORS « avec identifiants ».
+        allow_credentials=False,
         allow_origins=settings.cors_origins,
         allow_methods=["*"],
         allow_headers=["*"],

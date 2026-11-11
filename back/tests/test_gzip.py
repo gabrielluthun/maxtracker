@@ -37,3 +37,11 @@ def test_no_gzip_when_client_does_not_accept_it():
     client = _client_with_payload(50_000)
     res = client.get("/_test/payload", headers={"Accept-Encoding": "identity"})
     assert "content-encoding" not in res.headers
+
+
+def test_cors_never_allows_credentials():
+    client = _client_with_payload(10)
+    res = client.get(
+        "/_test/payload", headers={"Origin": "https://evil.example", "Cookie": "a=b"}
+    )
+    assert res.headers.get("access-control-allow-credentials") is None
