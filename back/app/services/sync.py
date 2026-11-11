@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from app.config import Settings
 from app.db.repositories.sync_state import SyncStateRepository
 from app.db.repositories.trips import TripsRepository
-from app.domain.stations import metropolis_for, normalize_station, trip_id
+from app.domain.stations import is_same_city_trip, metropolis_for, normalize_station, trip_id
 from app.domain.train_classifier import classify_train_type
 from app.domain.trips import PARIS_TZ, paris_cleanup_cutoff
 from app.services.sncf.client import SncfClient
@@ -119,6 +119,10 @@ class SyncService:
                 continue
             if date < today_iso or date > future_iso:
                 continue
+            origine_norm = normalize_station(origine)
+            destination_norm = normalize_station(destination)
+            if is_same_city_trip(origine_norm, destination_norm):
+                continue
             tid = trip_id(train_no, date, origine, destination)
             if tid in seen:
                 continue
@@ -128,12 +132,8 @@ class SyncService:
             heure_depart = row.get("heure_depart") or "00:00"
             heure_arrivee = row.get("heure_arrivee") or "00:00"
             axe = row.get("axe") or ""
-            train_type = classify_train_type(entity, axe, origine, destination, train_no)
-            if train_type is None:
-                continue
+            train_type = classify_train_type(entity, axe)
 
-            origine_norm = normalize_station(origine)
-            destination_norm = normalize_station(destination)
             docs.append({
                 "_id": tid,
                 "train_no": train_no,
