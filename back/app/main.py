@@ -15,6 +15,7 @@ from app.db.mongodb import Database
 from app.db.repositories.search_cache import SearchCacheRepository
 from app.db.repositories.sync_state import SyncStateRepository
 from app.db.repositories.trips import TripsRepository
+from app.domain.station_labels import refresh_trigramme_map_if_stale
 from app.services.search import SearchService
 from app.services.sncf.client import SncfClient
 from app.services.sync import SyncService
@@ -68,8 +69,19 @@ async def lifespan(app: FastAPI):
         id="cleanup_job",
         max_instances=1,
     )
+    # Réessaie toutes les 30 min si le chargement a échoué ; sinon 1 fois / 24 h.
+    scheduler.add_job(
+        refresh_trigramme_map_if_stale,
+        "interval",
+        minutes=30,
+        id="station_labels_job",
+        max_instances=1,
+    )
     scheduler.start()
     app.state.scheduler = scheduler
+
+    # En arrière-plan : ne retarde pas le démarrage si data.sncf.com est lent.
+    app.state.station_labels_task = asyncio.create_task(refresh_trigramme_map_if_stale())
 
     if await trips_repo.count() == 0:
         asyncio.create_task(sync_service.sync_trips())
