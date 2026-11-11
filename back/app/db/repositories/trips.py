@@ -133,5 +133,6 @@ class TripsRepository:
             {"$group": {"_id": "$origine"}},
             {"$limit": limit * 2},
         ]
-        rows = await self._col.aggregate(pipeline).to_list(limit * 2)
+        cursor = await self._col.aggregate(pipeline)  # PyMongo async : aggregate est une coroutine
+        rows = await cursor.to_list(limit * 2)
         return [r["_id"] for r in rows]

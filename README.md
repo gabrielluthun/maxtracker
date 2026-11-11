@@ -279,7 +279,7 @@ Tests backend : `cd back && pytest tests/` · Tests et lint frontend : `cd front
 | Couche | Technologie |
 |--------|-------------|
 | Frontend | React 19, Vite, TanStack Query, Tailwind CSS, Radix UI, Recharts (chargé à la demande), Vitest |
-| Backend | FastAPI, Uvicorn, Motor, APScheduler |
+| Backend | FastAPI, Uvicorn, PyMongo (API async), APScheduler |
 | Base | MongoDB (`trips`, `sync_state`, `search_cache`) |
 | Source | [Open Data SNCF, jeu tgvmax](https://data.sncf.com/explore/dataset/tgvmax/) |
 

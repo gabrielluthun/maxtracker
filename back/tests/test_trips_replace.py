@@ -4,7 +4,7 @@ import os
 import uuid
 
 import pytest
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 from pymongo.errors import PyMongoError
 
 from app.db.repositories.trips import TRIPS_INDEXES, TripsRepository
@@ -13,11 +13,11 @@ MONGO_URL = "mongodb://127.0.0.1:27017"
 
 
 async def _mongo_or_skip():
-    client = AsyncIOMotorClient(MONGO_URL, serverSelectionTimeoutMS=500)
+    client = AsyncMongoClient(MONGO_URL, serverSelectionTimeoutMS=500)
     try:
         await client.admin.command("ping")
     except PyMongoError:
-        client.close()
+        await client.close()
         if os.environ.get("REQUIRE_MONGO"):
             raise  # en CI, une base absente est une erreur, pas un test ignoré
         pytest.skip("MongoDB local indisponible")
@@ -32,7 +32,7 @@ async def trips_col():
         yield db.trips
     finally:
         await client.drop_database(db.name)
-        client.close()
+        await client.close()
 
 
 def _docs(prefix: str, n: int) -> list[dict]:
