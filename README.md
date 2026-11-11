@@ -43,9 +43,11 @@ Pour le détail des filtres, des parcours composés, des horodatages affichés e
 - **Trajets directs** et **parcours avec correspondance** (filtre : direct ou 1 correspondance)
 - **Filtres simples** : type de train, correspondances max
 - **Filtres avancés** : horizon de dates (7 / 14 / 30 j, défaut 30 j), créneaux horaires, durée totale max (≤ 3 h / 5 h / 8 h), départ aujourd'hui, et départ week-end uniquement
-- Vues **Liste**, **Calendrier** (30 jours) et **Pics horaires**
-- Badge **« Départ possible aujourd'hui »**, badge **« Imminent »** (< 4 h)
+- Vues **Liste**, **Calendrier** (sur l'horizon choisi, un clic sur un jour filtre la liste) et **Pics horaires**
+- **Recherche de destination** dans les résultats (« Où voulez-vous aller ? »)
+- Badge **« Départ possible aujourd'hui »**, badge **« Imminent »** (< 4 h), mention **« +1 j »** sur les arrivées le lendemain
 - Gares **favoris**, **masquage** de destinations, **sync manuelle**
+- **Lien partageable** : gare, filtres et vue sont dans l'URL (bouton « Précédent » compris) ; derniers filtres mémorisés d'une visite à l'autre
 - **Mode clair / sombre** (préférence mémorisée, transition en fondu au basculement)
 
 ---
@@ -58,12 +60,14 @@ Ouvrez l'application web, puis :
 2. Lancez la recherche
 3. Parcourez les résultats **par ville de destination** (trains directs et parcours composés, triés par date)
 4. Affinez avec les **filtres** dans le panneau *Filtres simples* / *Filtres avancés* (ou la feuille mobile)
-5. Changez de vue : **Liste**, **Calendrier** ou **Pics horaires**
+5. Cherchez une ville précise avec **« Où voulez-vous aller ? »**, puis changez de vue : **Liste**, **Calendrier** ou **Pics horaires**
 6. Ouvrez **SNCF Connect** depuis chaque train pour réserver (un lien par segment sur les parcours avec correspondance)
 
 **Astuces**
 
 - **Gares favorites** enregistrées localement dans votre navigateur
+- **Partagez une recherche** en copiant l'adresse de la page : elle contient la gare, les filtres et la vue
+- **Calendrier** : cliquez sur un jour pour n'afficher que ses trajets
 - **Masquer** une destination que vous ne voulez plus voir (réversible via « Réafficher tout »)
 - **Correspondances max** : *Direct* par défaut ; passez à *1 correspondance* pour voir les parcours composés
 - **Horizon de dates** : 30 j par défaut ; réduisez à 7 ou 14 j pour alléger la liste
@@ -89,7 +93,9 @@ Ouvrez l'application web, puis :
 | Ne garder que les départs du jour | Filtre *Départ aujourd'hui* |
 | Cibler le week-end ou un créneau | Filtres week-end et horaires |
 | Ne garder que TGV INOUI ou Intercités | Filtres par type de train |
-| Planifier sur le mois | Vue calendrier |
+| Trouver une ville précise | Champ « Où voulez-vous aller ? » |
+| Planifier sur le mois | Vue calendrier (clic sur un jour → trajets de ce jour) |
+| Partager une recherche | Copier l'adresse de la page |
 | Repérer les meilleures heures | Graphique des pics horaires |
 | Réserver | Lien(s) SNCF Connect (par segment si correspondance) |
 
@@ -128,7 +134,7 @@ Ce dépôt contient le code source de MaxTracker (API FastAPI + interface React)
 
 ### Démarrage local
 
-**Prérequis :** Python 3.11, Node.js 18+, MongoDB.
+**Prérequis :** Python 3.11, Node.js 20.19+ (requis par Vite), MongoDB.
 
 **MongoDB local fortement recommandé** pour des temps de réponse corrects (cache de recherche ~200 Mo) : une source distante ajoute une latence réseau importante sur les interactions utilisateur.
 
@@ -143,7 +149,7 @@ cd back
 cp .env.example .env
 # Par défaut : MONGO_URL=mongodb://127.0.0.1:27017
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # dépendances de l'app + outils de test
 uvicorn server:app --reload --port 8000
 
 # Frontend (autre terminal)
@@ -164,7 +170,8 @@ Au premier lancement avec une base vide, une **sync SNCF automatique** s'exécut
 tgvmax-platform/
 ├── back/                          # API FastAPI
 │   ├── server.py                  # Point d'entrée Uvicorn
-│   ├── requirements.txt
+│   ├── requirements.txt           # dépendances de production
+│   ├── requirements-dev.txt       # + pytest (développement, CI)
 │   ├── runtime.txt                # Version Python (Render)
 │   ├── .env.example
 │   ├── app/
@@ -193,8 +200,9 @@ tgvmax-platform/
 │   │       ├── sync.py            # pipeline SNCF → Mongo
 │   │       └── sncf/              # client Open Data + liens Connect
 │   └── tests/
-├── front/                         # SPA React (CRA + Craco)
-│   ├── public/
+├── front/                         # SPA React (Vite)
+│   ├── index.html                 # point d'entrée Vite
+│   ├── vite.config.mjs            # alias @/, port 3000, sortie build/, Vitest
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── AppRouter.jsx      # navigation Recherche / À propos
@@ -205,13 +213,15 @@ tgvmax-platform/
 │   │   ├── pages/
 │   │   │   ├── Home.jsx
 │   │   │   └── About.jsx
-│   │   └── lib/                   # api, storage, tripTime, utils
+│   │   └── lib/                   # api, sncfConnect, storage, tripKeys, tripTime, utils
 │   └── package.json
 ├── doc/
 │   ├── regles-de-gestion.md
 │   ├── contraintes.md
 │   └── rapport-limite-correspondances.md
-└── .github/workflows/             # PR / Issues templates
+└── .github/
+    ├── workflows/ci.yml           # CI : tests backend (+ MongoDB), lint/tests/build frontend
+    └── ISSUE_TEMPLATE/, PULL_REQUEST_TEMPLATE.md
 ```
 
 ### Variables d'environnement
@@ -230,9 +240,10 @@ Optionnel :
 |----------|--------|-------------|
 | `SYNC_INTERVAL_MIN` | `15` | Intervalle de sync automatique |
 | `CACHE_WARM_CONCURRENCY` | `8` | Parallélisme du warm cache post-sync |
-| `SEARCH_RESULT_LIMIT` | `5000` | Plafond de documents Mongo par requête recherche |
+| `SEARCH_RESULT_LIMIT` | `20000` | Garde-fou : trajets max. au départ d'une gare (alerte dans les logs s'il est atteint) |
+| `TRUSTED_PROXY_HOPS` | `0` | Proxys de confiance devant l'API (Vercel, nginx) pour la limite par IP — voir [doc/deploiement.md](doc/deploiement.md) |
 
-**Frontend** (build) : `REACT_APP_BACKEND_URL` — URL du backend **sans** `/api`.
+**Frontend** (build) : `REACT_APP_BACKEND_URL` — URL du backend **sans** `/api` (préfixe `REACT_APP_` conservé via `envPrefix` dans `vite.config.mjs`).
 
 ### API
 
@@ -240,19 +251,23 @@ Préfixe : `/api`
 
 | Méthode | Route | Description |
 |---------|-------|-------------|
-| `GET` | `/` | Santé |
-| `GET` | `/search?origin={gare}` | Trajets directs + `connected_trips` par destination (cache L1/L2) |
-| `GET` | `/stations/search?q={texte}` | Autocomplétion gares (≥ 3 caractères) |
+| `GET` | `/` | Santé (réponse fixe) |
+| `GET` | `/health` | Supervision : MongoDB + fraîcheur des syncs (`ok` / `degraded` → 200, `down` → 503) |
+| `GET` | `/search?origin={gare}&connections=0\|1&compact=0\|1` | Trajets par destination (cache L1/L2). Par défaut : réponse complète. `connections=0` : directs seuls (+ `omitted_connected_trips`) ; `compact=1` : sans les champs recalculés côté client (lien SNCF Connect, ids…) |
+| `GET` | `/stations/search?q={texte}` | Autocomplétion gares (≥ 3 caractères) : insensible aux accents, tirets et « Saint »/« St », mots n'importe où dans le nom, gares regroupées par la SNCF retrouvées par leur vrai nom (« Montparnasse » → Paris) |
 | `GET` | `/sync/info` | État de la synchronisation |
-| `POST` | `/sync/trigger` | Sync manuelle SNCF + warm cache |
+| `POST` | `/sync/trigger` | Sync manuelle SNCF + warm cache (1 toutes les 3 min, sinon HTTP 429 + `Retry-After`) |
 
 Comportements notables :
 
-- **Cache** : L1 mémoire (LRU) + L2 collection Mongo `search_cache` ; refresh stale en arrière-plan si les données SNCF ont changé.
+- **Cache** : L1 mémoire (LRU) + L2 collection Mongo `search_cache` ; refresh stale en arrière-plan si les données SNCF ont changé. Les réponses mises en forme et compressées sont aussi gardées en mémoire, par origine, variante et minute (~3 ms par hit).
+- **Volumes** (Paris) : complet 640 Ko gzip ; directs seuls + compact 43 Ko — c'est ce que charge le front par défaut, les correspondances n'étant demandées que si le filtre les affiche.
 - **Rate limit** : 10 recherches « cold compute » / minute / IP (HTTP 429) ; les hits cache ne sont pas limités.
+- **Compression** : réponses > 1 Ko compressées en gzip (niveau 6) — `/search` Paris passe de ~17,7 Mo à ~640 Ko.
+- **Sync** : une seule à la fois (verrou) ; la collection `trips` est remplacée de façon atomique (`trips_staging` puis `renameCollection`). Le référentiel des gares (libellés) est chargé en arrière-plan et rechargé au plus une fois par jour.
 - **Première recherche** sur une origine non cachée : calcul serveur (~15–25 s) ; les recherches suivantes sont quasi instantanées avec Mongo.
 
-Tests backend : `cd back && pytest tests/`
+Tests backend : `cd back && pytest tests/` · Tests et lint frontend : `cd front && npm test && npm run lint`
 
 ### Documentation technique
 
@@ -261,18 +276,19 @@ Tests backend : `cd back && pytest tests/`
 | [doc/regles-de-gestion.md](doc/regles-de-gestion.md) | Règles de gestion |
 | [doc/contraintes.md](doc/contraintes.md) | Contraintes données, métier, légales |
 | [doc/rapport-limite-correspondances.md](doc/rapport-limite-correspondances.md) | Limitation à 1 correspondance (taille cache MongoDB) |
+| [doc/deploiement.md](doc/deploiement.md) | Mise à jour du VPS, variables, proxys, HTTPS, supervision, CI |
 | [front/src/pages/About.jsx](front/src/pages/About.jsx) | Page À propos (parcours, filtres, sync) |
 
 ### Stack
 
 | Couche | Technologie |
 |--------|-------------|
-| Frontend | React 19, TanStack Query, Tailwind CSS, Radix UI, Recharts |
-| Backend | FastAPI, Uvicorn, Motor, APScheduler |
+| Frontend | React 19, Vite, TanStack Query, Tailwind CSS, Radix UI, Recharts (chargé à la demande), Vitest |
+| Backend | FastAPI, Uvicorn, PyMongo (API async), APScheduler |
 | Base | MongoDB (`trips`, `sync_state`, `search_cache`) |
 | Source | [Open Data SNCF, jeu tgvmax](https://data.sncf.com/explore/dataset/tgvmax/) |
 
-**Déploiement :** backend et MongoDB sur un VPS ; frontend sur un hébergement statique.
+**Déploiement :** backend et MongoDB sur un VPS ; frontend sur Vercel — détails dans [doc/deploiement.md](doc/deploiement.md).
 
 ```mermaid
 flowchart LR

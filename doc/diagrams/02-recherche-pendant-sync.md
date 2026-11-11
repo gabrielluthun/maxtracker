@@ -2,7 +2,7 @@
 
 `last_sync_at` n’a pas encore changé. Le cache est donc encore considéré à jour : on sert l’**ancienne** réponse, sans refresh.
 
-Le trou : une origine **sans cache** lit `trips` pendant le `DELETE` + `INSERT`. La collection peut être vide ou incomplète, et ce mauvais résultat peut être écrit en cache.
+Une origine **sans cache** est calculée sur `trips`. Le nouveau jeu est écrit dans `trips_staging`, puis basculé d’un seul coup (`renameCollection`) : le calcul voit soit l’ancien jeu complet, soit le nouveau, **jamais** une collection vide ou à moitié remplie.
 
 ```mermaid
 flowchart TD
@@ -10,5 +10,5 @@ flowchart TD
   L1 -->|hit| R[renvoie l'ancien résultat<br/>pas de refresh]
   L1 -->|miss| L2{L2 Mongo gzip ?}
   L2 -->|hit| R
-  L2 -->|miss| C[compute sur la collection trips]
+  L2 -->|miss| C[compute sur trips<br/>ancien ou nouveau jeu complet]
 ```

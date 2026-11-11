@@ -1,13 +1,16 @@
-import { memo, useState } from "react";
+import { memo, useId, useState } from "react";
 import { ChevronDown, ChevronUp, MapPin, EyeOff } from "lucide-react";
 import TrainCard from "@/components/TrainCard";
 import ConnectedTripCard from "@/components/ConnectedTripCard";
+import NewBadge from "@/components/NewBadge";
 import {
   formatTripDayLabel,
   getParisClock,
   groupDestinationItemsByDate,
+  countNewItems,
   groupHasDepartureToday,
 } from "@/lib/tripTime";
+import { journeyKey, tripKey } from "@/lib/tripKeys";
 
 function DayHeader({ date, today, itemCount }) {
   return (
@@ -32,9 +35,11 @@ function DayHeader({ date, today, itemCount }) {
 
 function DestinationGroup({ group, onHide }) {
   const [open, setOpen] = useState(false);
+  const panelId = useId();
   const connected = group.connected_trips || [];
   const today = getParisClock().today;
   const hasTodayDeparture = groupHasDepartureToday(group.trips, connected);
+  const newCount = countNewItems(group.trips, connected);
   const daySections = open ? groupDestinationItemsByDate(group.trips, connected) : [];
 
   return (
@@ -42,59 +47,67 @@ function DestinationGroup({ group, onHide }) {
       className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl"
       data-testid={`destination-group-${group.destination_city}`}
     >
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between p-5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left rounded-2xl"
-        data-testid={`group-toggle-${group.destination_city}`}
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="h-10 w-10 rounded-xl bg-[#0A2540]/5 dark:bg-slate-700 flex items-center justify-center shrink-0">
-            <MapPin className="h-5 w-5 text-[#0A2540] dark:text-slate-200" strokeWidth={2.25} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <h3 className="font-semibold text-lg text-slate-900 dark:text-slate-100 truncate">
-                {group.destination_city}
-              </h3>
-              {hasTodayDeparture && (
-                <span
-                  className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-[#10B981]/10 text-[#10B981] border-[#10B981]/30 filter-accent-highlight"
-                  data-testid={`today-badge-${group.destination_city}`}
-                  title="Au moins un train part aujourd'hui vers cette destination"
-                >
-                  Départ possible aujourd&apos;hui
+      {/* Deux boutons frères (et non imbriqués) : ouvrir le groupe / masquer la destination. */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          aria-controls={panelId}
+          className="w-full flex items-center justify-between p-5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left rounded-2xl"
+          data-testid={`group-toggle-${group.destination_city}`}
+        >
+          <span className="flex items-center gap-3 min-w-0">
+            <span className="h-10 w-10 rounded-xl bg-[#0A2540]/5 dark:bg-slate-700 flex items-center justify-center shrink-0">
+              <MapPin className="h-5 w-5 text-[#0A2540] dark:text-slate-200" strokeWidth={2.25} />
+            </span>
+            <span className="block min-w-0">
+              <span className="flex flex-wrap items-center gap-2 min-w-0">
+                <span className="font-semibold text-lg text-slate-900 dark:text-slate-100 truncate">
+                  {group.destination_city}
                 </span>
-              )}
-            </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-              {group.destinations.length > 1 ? `${group.destinations.length} gares · ` : ""}
-              <span className="font-mono">{group.trip_count}</span> trajet
-              {group.trip_count > 1 ? "s" : ""} à 0€
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onHide(group.destination_city);
-            }}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-            title="Masquer cette destination"
-            data-testid={`hide-${group.destination_city}`}
-          >
-            <EyeOff className="h-4 w-4" />
-          </button>
-          {open ? (
-            <ChevronUp className="h-5 w-5 text-slate-400" />
-          ) : (
-            <ChevronDown className="h-5 w-5 text-slate-400" />
-          )}
-        </div>
-      </button>
+                {hasTodayDeparture && (
+                  <span
+                    className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-[#10B981]/10 text-[#10B981] border-[#10B981]/30 filter-accent-highlight"
+                    data-testid={`today-badge-${group.destination_city}`}
+                    title="Au moins un train part aujourd'hui vers cette destination"
+                  >
+                    Départ possible aujourd&apos;hui
+                  </span>
+                )}
+                {newCount > 0 && <NewBadge count={newCount} className="rounded-full py-0.5" />}
+              </span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400 truncate">
+                {group.destinations.length > 1 ? `${group.destinations.length} gares · ` : ""}
+                <span className="font-mono">{group.trip_count}</span> trajet
+                {group.trip_count > 1 ? "s" : ""} à 0€
+              </span>
+            </span>
+          </span>
+          <span className="flex items-center gap-2 shrink-0">
+            {/* Réserve la place du bouton « masquer », posé par-dessus. */}
+            <span className="h-8 w-8" aria-hidden="true" />
+            {open ? (
+              <ChevronUp className="h-5 w-5 text-slate-400" aria-hidden="true" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-slate-400" aria-hidden="true" />
+            )}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onHide(group.destination_city)}
+          className="absolute top-1/2 -translate-y-1/2 right-12 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+          title="Masquer cette destination"
+          aria-label={`Masquer la destination ${group.destination_city}`}
+          data-testid={`hide-${group.destination_city}`}
+        >
+          <EyeOff className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
 
       {open && (
-        <div className="px-5 pb-5">
+        <div id={panelId} className="px-5 pb-5">
           {group.destinations.length > 1 && (
             <div className="mb-3 flex flex-wrap gap-1.5">
               {group.destinations.map((d) => (
@@ -115,9 +128,9 @@ function DestinationGroup({ group, onHide }) {
                 <div className="space-y-3 pt-3">
                   {day.items.map((item) =>
                     item.kind === "direct" ? (
-                      <TrainCard key={item.trip.id} trip={item.trip} />
+                      <TrainCard key={tripKey(item.trip)} trip={item.trip} />
                     ) : (
-                      <ConnectedTripCard key={item.connected.id} connected={item.connected} />
+                      <ConnectedTripCard key={journeyKey(item.connected)} connected={item.connected} />
                     )
                   )}
                 </div>

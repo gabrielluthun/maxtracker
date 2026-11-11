@@ -42,6 +42,7 @@ def trip_out_from_segment(
         destination_metropolis=seg.destination_metropolis,
         departure_datetime=seg.departure_datetime
         or f"{seg.date}T{seg.heure_depart[:5]}:00",
+        is_new=seg.is_new,
     )
 
 
@@ -72,6 +73,7 @@ def connected_trip_out_from_journey(
         destination_metropolis=journey.destination_metropolis,
         legs=legs,
         price_checked_at=price_checked_at,
+        is_new=any(leg.is_new for leg in legs),
     )
 
 

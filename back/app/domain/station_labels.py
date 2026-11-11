@@ -3,15 +3,23 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 import unicodedata
-from functools import lru_cache
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 
 from app.config import get_settings
 
 logger = logging.getLogger("maxtracker")
+
+# Le référentiel gares-de-voyageurs change rarement : on le recharge au plus
+# une fois par jour, et on garde la dernière version valide si SNCF échoue.
+TRIGRAMME_MAP_MAX_AGE_SECONDS = 24 * 3600
+_GARES_FETCH_TIMEOUT_SECONDS = 60.0
+
+_trigramme_map: dict[str, str] = {}
+_trigramme_loaded_at: Optional[float] = None
 
 # Codes transporteur dont le suffixe ne correspond pas au trigramme gares-de-voyageurs.
 TRANSPORTER_CODE_OVERRIDES: dict[str, str] = {
@@ -82,21 +90,18 @@ def _gare_matches_station_label(gare_name: str, raw_label: str) -> bool:
     return False
 
 
-@lru_cache(maxsize=1)
 def _load_trigramme_map() -> dict[str, str]:
-    settings = get_settings()
-    url = settings.sncf_gares_export_url
-    try:
-        with httpx.Client(timeout=60.0) as client:
-            response = client.get(url, params={"limit": -1})
-            response.raise_for_status()
-            rows = response.json()
-    except Exception as exc:
-        logger.warning("SNCF gares referential fetch failed: %s", exc)
-        return {}
+    """Référentiel en mémoire. Jamais d'appel réseau ici : c'est le chemin des requêtes.
 
+    Rempli en arrière-plan par `refresh_trigramme_map`. Tant qu'il est vide,
+    `display_station_name` retombe sur le libellé SNCF mis en forme.
+    """
+    return _trigramme_map
+
+
+def _parse_gares_rows(rows: Any) -> dict[str, str]:
     mapping: dict[str, str] = {}
-    for row in rows:
+    for row in rows if isinstance(rows, list) else []:
         tri = (row.get("libellecourt") or "").strip().upper()
         name = (row.get("nom") or "").strip()
         if tri and name:
@@ -104,9 +109,67 @@ def _load_trigramme_map() -> dict[str, str]:
     return mapping
 
 
+async def refresh_trigramme_map(
+    *,
+    url: Optional[str] = None,
+    transport: Optional[httpx.AsyncBaseTransport] = None,
+) -> int:
+    """Recharge le référentiel gares SNCF sans bloquer la boucle d'événements.
+
+    Retourne le nombre de trigrammes chargés, 0 en cas d'échec — la version
+    précédente est alors conservée (un échec n'efface jamais le référentiel).
+    """
+    global _trigramme_map, _trigramme_loaded_at
+    url = url or get_settings().sncf_gares_export_url
+    try:
+        async with httpx.AsyncClient(
+            timeout=_GARES_FETCH_TIMEOUT_SECONDS, transport=transport
+        ) as client:
+            response = await client.get(url, params={"limit": -1})
+            response.raise_for_status()
+            rows = response.json()
+    except Exception as exc:
+        logger.warning(
+            "SNCF gares referential fetch failed: %s — keeping %d cached entries",
+            exc,
+            len(_trigramme_map),
+        )
+        return 0
+
+    mapping = _parse_gares_rows(rows)
+    if not mapping:
+        logger.warning("SNCF gares referential is empty — keeping previous version")
+        return 0
+    _trigramme_map = mapping
+    _trigramme_loaded_at = time.monotonic()
+    logger.info("SNCF gares referential loaded: %d trigrammes", len(mapping))
+    return len(mapping)
+
+
+async def refresh_trigramme_map_if_stale(
+    *,
+    max_age_seconds: float = TRIGRAMME_MAP_MAX_AGE_SECONDS,
+    **kwargs: Any,
+) -> int:
+    """Recharge si jamais chargé (ou dernier essai échoué) ou plus vieux que `max_age_seconds`."""
+    if (
+        _trigramme_loaded_at is not None
+        and time.monotonic() - _trigramme_loaded_at < max_age_seconds
+    ):
+        return 0
+    return await refresh_trigramme_map(**kwargs)
+
+
+def referential_version() -> Optional[float]:
+    """Change à chaque rechargement du référentiel (pour invalider ce qui en dépend)."""
+    return _trigramme_loaded_at
+
+
 def clear_trigramme_cache() -> None:
-    """Réinitialise le cache (tests)."""
-    _load_trigramme_map.cache_clear()
+    """Réinitialise le référentiel en mémoire (tests)."""
+    global _trigramme_map, _trigramme_loaded_at
+    _trigramme_map = {}
+    _trigramme_loaded_at = None
 
 
 def display_station_name(label: str, transporter_code: Optional[str] = None) -> str:

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { SlidersHorizontal, X } from "lucide-react";
 import FiltersPanel from "@/components/FiltersPanel";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { cn } from "@/lib/utils";
 
 export default function MobileFiltersSheet({
@@ -47,11 +48,26 @@ export default function MobileFiltersSheet({
     }, 220);
   };
 
+  const titleId = useId();
+  const sheetRef = useDialogFocus(mounted, closeSheet);
+
+  // Pas de défilement de la page derrière la feuille.
+  useEffect(() => {
+    if (!mounted) return undefined;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [mounted]);
+
   return (
     <>
       <button
         type="button"
         onClick={openWithPressAnimation}
+        aria-haspopup="dialog"
+        aria-expanded={mounted}
         className={cn(
           "lg:hidden fixed bottom-4 right-4 z-40 inline-flex items-center gap-2 rounded-full bg-[#0A2540] text-white px-4 py-3 shadow-lg transition-all duration-150 ease-out",
           btnPressed ? "scale-90 shadow-md bg-[#173A5E]" : "scale-100"
@@ -66,6 +82,7 @@ export default function MobileFiltersSheet({
         <div className="lg:hidden fixed inset-0 z-50" data-testid="mobile-filters-sheet">
           <button
             type="button"
+            tabIndex={-1}
             aria-label="Fermer les filtres"
             className={cn(
               "absolute inset-0 bg-slate-900/35 transition-opacity duration-200",
@@ -74,13 +91,18 @@ export default function MobileFiltersSheet({
             onClick={closeSheet}
           />
           <div
+            ref={sheetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            tabIndex={-1}
             className={cn(
               "absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-3xl bg-white dark:bg-slate-900 p-4 pb-6 shadow-2xl transition-transform duration-200 ease-out",
               open ? "translate-y-0" : "translate-y-full"
             )}
           >
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Filtres</h3>
+              <h3 id={titleId} className="text-base font-bold text-slate-900 dark:text-slate-100">Filtres</h3>
               <button
                 type="button"
                 onClick={closeSheet}

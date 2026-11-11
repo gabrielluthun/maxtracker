@@ -1,17 +1,42 @@
 """SNCF → MongoDB sync pipeline."""
 import asyncio
 import logging
+import math
+import time
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 from app.config import Settings
 from app.db.repositories.sync_state import SyncStateRepository
 from app.db.repositories.trips import TripsRepository
-from app.domain.stations import metropolis_for, normalize_station, trip_id
+from app.domain.freshness import first_seen_for, is_new_trip, publication_changed
+from app.domain.stations import is_same_city_trip, metropolis_for, normalize_station, trip_id
 from app.domain.train_classifier import classify_train_type
 from app.domain.trips import PARIS_TZ, paris_cleanup_cutoff
 from app.services.sncf.client import SncfClient
 
 logger = logging.getLogger("maxtracker")
+
+# Une sync forcée retélécharge tout l'export SNCF et recalcule le cache de
+# toutes les origines : c'est une opération globale, limitée pour tout le monde.
+MANUAL_SYNC_COOLDOWN_SECONDS = 180
+
+# Version du traitement des données (import SNCF + calcul des recherches mises en
+# cache). À incrémenter quand une modification change les trajets retenus ou les
+# résultats : au premier passage après le déploiement, la sync reconstruit tout
+# même si la SNCF n'a rien publié de nouveau.
+#   2 : trains éligibles plus filtrés comme « TER », trajets intra-ville exclus,
+#       correspondances non tronquées.
+#   3 : date d'apparition des trajets et badge « nouveau ».
+PIPELINE_VERSION = 3
+
+
+class SyncCooldown(Exception):
+    """Une sync manuelle a été lancée trop récemment."""
+
+    def __init__(self, retry_after_seconds: int) -> None:
+        super().__init__(f"retry after {retry_after_seconds}s")
+        self.retry_after_seconds = retry_after_seconds
 
 
 class SyncService:
@@ -22,6 +47,9 @@ class SyncService:
         sync_repo: SyncStateRepository,
         sncf: SncfClient,
         search_service=None,
+        *,
+        manual_cooldown_seconds: int = MANUAL_SYNC_COOLDOWN_SECONDS,
+        clock=time.monotonic,
     ) -> None:
         self._settings = settings
         self._trips = trips_repo
@@ -30,8 +58,35 @@ class SyncService:
         self._search = search_service
         self._warm_task: asyncio.Task | None = None
         self._warm_generation = 0
+        self._lock = asyncio.Lock()
+        self._manual_cooldown_seconds = manual_cooldown_seconds
+        self._clock = clock
+        self._last_manual_at: float | None = None
+
+    def manual_sync_retry_after(self) -> int:
+        """Secondes restantes avant d'accepter une nouvelle sync manuelle (0 = possible)."""
+        if self._last_manual_at is None:
+            return 0
+        remaining = self._manual_cooldown_seconds - (self._clock() - self._last_manual_at)
+        return max(0, math.ceil(remaining))
+
+    async def trigger_manual_sync(self) -> dict:
+        """Sync forcée déclenchée par un utilisateur ; lève SyncCooldown si trop récente."""
+        retry_after = self.manual_sync_retry_after()
+        if retry_after > 0:
+            raise SyncCooldown(retry_after)
+        self._last_manual_at = self._clock()
+        return await self.sync_trips(force=True)
 
     async def sync_trips(self, *, force: bool = False) -> dict:
+        # Pas d'await entre le test et l'acquisition : pas de course possible.
+        if self._lock.locked():
+            logger.info("SNCF sync already running — skip (force=%s)", force)
+            return {"status": "skipped", "reason": "sync_in_progress"}
+        async with self._lock:
+            return await self._sync_trips_locked(force=force)
+
+    async def _sync_trips_locked(self, *, force: bool) -> dict:
         started = datetime.now(timezone.utc)
         logger.info("Starting SNCF sync at %s force=%s", started.isoformat(), force)
 
@@ -42,6 +97,7 @@ class SyncService:
             and sncf_updated is not None
             and previous_updated is not None
             and sncf_updated == previous_updated
+            and await self._sync.get_pipeline_version() == PIPELINE_VERSION
         ):
             await self._sync.update({
                 "last_sync_status": "skipped",
@@ -75,6 +131,10 @@ class SyncService:
                 continue
             if date < today_iso or date > future_iso:
                 continue
+            origine_norm = normalize_station(origine)
+            destination_norm = normalize_station(destination)
+            if is_same_city_trip(origine_norm, destination_norm):
+                continue
             tid = trip_id(train_no, date, origine, destination)
             if tid in seen:
                 continue
@@ -84,12 +144,8 @@ class SyncService:
             heure_depart = row.get("heure_depart") or "00:00"
             heure_arrivee = row.get("heure_arrivee") or "00:00"
             axe = row.get("axe") or ""
-            train_type = classify_train_type(entity, axe, origine, destination, train_no)
-            if train_type is None:
-                continue
+            train_type = classify_train_type(entity, axe)
 
-            origine_norm = normalize_station(origine)
-            destination_norm = normalize_station(destination)
             docs.append({
                 "_id": tid,
                 "train_no": train_no,
@@ -113,6 +169,7 @@ class SyncService:
                 "synced_at": started.isoformat(),
             })
 
+        await self._stamp_freshness(docs, previous_publication=previous_updated, current_publication=sncf_updated)
         await self._trips.replace_all(docs)
         today, cur_time = paris_cleanup_cutoff()
         await self._trips.cleanup_today_before(cur_time)
@@ -128,6 +185,7 @@ class SyncService:
             "sncf_data_updated_at": sncf_updated,
             "total_trips": total,
             "last_error": None,
+            "pipeline_version": PIPELINE_VERSION,
         })
         logger.info(
             "Sync done. Total trips: %d (duration %.1fs)",
@@ -137,6 +195,32 @@ class SyncService:
 
         self._schedule_warm_cache()
         return {"status": "ok", "total": total}
+
+    async def _stamp_freshness(
+        self,
+        docs: list[dict],
+        *,
+        previous_publication: Optional[str],
+        current_publication: Optional[str],
+    ) -> None:
+        """Date d'apparition (`first_seen`) et badge « nouveau » (`is_new`) de chaque trajet."""
+        previous = await self._trips.first_seen_by_id()
+        changed = publication_changed(
+            previous_publication, current_publication, previous_trip_count=len(previous)
+        )
+        new_count = 0
+        for doc in docs:
+            seen = first_seen_for(
+                doc["_id"], previous, changed=changed, current_publication=current_publication
+            )
+            doc["first_seen"] = seen
+            doc["is_new"] = is_new_trip(seen, current_publication)
+            new_count += doc["is_new"]
+        logger.info(
+            "freshness: %d new trips in the last 24 h of publications (publication changed: %s)",
+            new_count,
+            changed,
+        )
 
     def _schedule_warm_cache(self) -> None:
         if self._search is None:

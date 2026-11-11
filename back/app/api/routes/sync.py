@@ -1,9 +1,10 @@
 from datetime import timezone
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from app.dependencies import SncfClientDep, SyncRepoDep, SyncServiceDep
 from app.schemas.trips import SyncInfo
+from app.services.sync import SyncCooldown
 
 router = APIRouter(prefix="/sync", tags=["sync"])
 
@@ -34,4 +35,11 @@ async def get_sync_info(request: Request, sync_repo: SyncRepoDep, sncf: SncfClie
 
 @router.post("/trigger")
 async def trigger_sync(sync_service: SyncServiceDep):
-    return await sync_service.sync_trips(force=True)
+    try:
+        return await sync_service.trigger_manual_sync()
+    except SyncCooldown as exc:
+        raise HTTPException(
+            status_code=429,
+            detail="Une synchronisation vient d'être lancée. Réessayez plus tard.",
+            headers={"Retry-After": str(exc.retry_after_seconds)},
+        )

@@ -23,6 +23,8 @@ class TripOut(BaseModel):
     sncf_connect_url: str
     destination_metropolis: Optional[str] = None
     departure_datetime: str
+    # Apparu dans les dernières 24 h de publications SNCF.
+    is_new: bool = False
 
 
 class ConnectedTripOut(BaseModel):
@@ -38,6 +40,8 @@ class ConnectedTripOut(BaseModel):
     destination_metropolis: Optional[str] = None
     legs: List[TripOut]
     price_checked_at: Optional[str] = None
+    # Au moins une étape est nouvelle : le parcours vient de devenir possible.
+    is_new: bool = False
 
 
 class DestinationGroup(BaseModel):
@@ -54,6 +58,8 @@ class SearchResponse(BaseModel):
     groups: List[DestinationGroup]
     last_sync_at: Optional[str] = None
     served: bool = True
+    # Uniquement avec connections=false : parcours avec correspondance non inclus.
+    omitted_connected_trips: Optional[int] = None
 
 
 class SyncInfo(BaseModel):
@@ -70,3 +76,5 @@ class StationSuggestion(BaseModel):
     name: str
     raw: str
     is_metropolis: bool = False
+    # Ex. « comprend Paris Montparnasse » quand la gare a été trouvée par ce nom.
+    hint: Optional[str] = None

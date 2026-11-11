@@ -1,6 +1,6 @@
 """In-memory rate limiting per client IP (cold computes only)."""
-from collections import defaultdict
-from datetime import datetime, timezone
+import time
+from typing import Callable
 
 
 class RateLimitExceeded(Exception):
@@ -8,20 +8,42 @@ class RateLimitExceeded(Exception):
 
 
 class RateLimiter:
-    def __init__(self, max_requests: int, window_seconds: int = 60) -> None:
+    def __init__(
+        self,
+        max_requests: int,
+        window_seconds: int = 60,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
         self._max_requests = max_requests
         self._window_seconds = window_seconds
-        self._store: dict[str, list[float]] = defaultdict(list)
+        self._clock = clock
+        self._store: dict[str, list[float]] = {}
+        self._last_sweep = clock()
 
     def allow(self, key: str) -> bool:
-        now = datetime.now(timezone.utc).timestamp()
-        window = self._store[key]
-        self._store[key] = [t for t in window if now - t < self._window_seconds]
-        if len(self._store[key]) >= self._max_requests:
+        now = self._clock()
+        self._sweep(now)
+        window = [t for t in self._store.get(key, ()) if now - t < self._window_seconds]
+        if len(window) >= self._max_requests:
+            self._store[key] = window
             return False
-        self._store[key].append(now)
+        window.append(now)
+        self._store[key] = window
         return True
 
     def check(self, key: str) -> None:
         if not self.allow(key):
             raise RateLimitExceeded()
+
+    def _sweep(self, now: float) -> None:
+        """Oublie les IP sans requête récente (au plus une fois par fenêtre)."""
+        if now - self._last_sweep < self._window_seconds:
+            return
+        self._last_sweep = now
+        stale = [k for k, ts in self._store.items() if not ts or now - ts[-1] >= self._window_seconds]
+        for key in stale:
+            del self._store[key]
+
+    def __len__(self) -> int:
+        return len(self._store)
