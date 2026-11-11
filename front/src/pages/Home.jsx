@@ -29,7 +29,7 @@ import WelcomeModal from "@/components/WelcomeModal";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSearchTrips } from "@/hooks/useSearchTrips";
-import { getHidden, unhideDestination, hideDestination } from "@/lib/storage";
+import { clearHidden, getHidden, unhideDestination, hideDestination } from "@/lib/storage";
 import { filterGroupsByDestination } from "@/lib/destinationSearch";
 import { cn } from "@/lib/utils";
 
@@ -205,7 +205,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
       },
     });
   }, []);
-  const onResetHidden = () => { localStorage.removeItem("mt_hidden_destinations"); setHidden([]); };
+  const onResetHidden = () => { clearHidden(); setHidden([]); };
 
   const showEmpty = !data && !loading && !searchOrigin;
   const showResults = data && data.served && data.total_trips > 0;
