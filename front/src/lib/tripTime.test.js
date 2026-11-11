@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  arrivalDayOffset,
   calendarDays,
   isImminentDeparture,
   minutesUntilDeparture,
@@ -46,5 +47,14 @@ describe("isImminentDeparture", () => {
     expect(isImminentDeparture("2026-11-11", "22:00", lateEvening)).toBe(false); // parti
     expect(isImminentDeparture("2026-11-12", "02:30", lateEvening)).toBe(false); // 4 h pile
     expect(isImminentDeparture("2026-11-13", "08:00", lateEvening)).toBe(false);
+  });
+});
+
+describe("arrivalDayOffset", () => {
+  it("detects next-day arrivals from the total duration", () => {
+    expect(arrivalDayOffset("22:00", 9 * 60 + 30)).toBe(1); // 22:00 → 07:30
+    expect(arrivalDayOffset("07:00", 130)).toBe(0);
+    expect(arrivalDayOffset("23:30", 30)).toBe(1); // arrivée à 00:00 pile
+    expect(arrivalDayOffset("08:00", null)).toBe(0);
   });
 });

@@ -1,7 +1,8 @@
 import { memo, useId, useState } from "react";
 import { ArrowRight, ChevronDown, ChevronUp, GitBranch, Zap } from "lucide-react";
 import TrainCard from "@/components/TrainCard";
-import { isImminentDeparture } from "@/lib/tripTime";
+import NextDayMark from "@/components/NextDayMark";
+import { arrivalDayOffset, isImminentDeparture } from "@/lib/tripTime";
 import { journeyKey, tripKey } from "@/lib/tripKeys";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +19,7 @@ function ConnectedTripCard({ connected, defaultOpen = false }) {
   const legsId = useId();
   const key = journeyKey(connected);
   const imminent = isImminentDeparture(connected.date, connected.heure_depart);
+  const arrivalOffset = arrivalDayOffset(connected.heure_depart, connected.total_duration_minutes);
   const waitH = Math.floor(connected.connection_minutes / 60);
   const waitM = connected.connection_minutes % 60;
   const waitLabel =
@@ -71,6 +73,7 @@ function ConnectedTripCard({ connected, defaultOpen = false }) {
             </span>
             <div className="font-mono text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
               {fmtHHmm(connected.heure_arrivee)}
+              <NextDayMark offset={arrivalOffset} />
             </div>
           </div>
           <div className="flex items-center gap-2 ml-auto shrink-0">

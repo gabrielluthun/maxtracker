@@ -113,6 +113,12 @@ export function tripDurationMinutes(heureDepart, heureArrivee) {
   return mins;
 }
 
+/** Jours entre départ et arrivée (0 = même jour, 1 = lendemain) d'après la durée totale. */
+export function arrivalDayOffset(heureDepart, durationMinutes) {
+  if (durationMinutes == null || durationMinutes < 0) return 0;
+  return Math.floor((parseMinutesHHmm(heureDepart) + durationMinutes) / 1440);
+}
+
 function enrichTripTiming(trip, clock) {
   const h = parseInt((trip.heure_depart || "0").slice(0, 2), 10);
   const day = new Date(`${trip.date}T12:00:00`).getDay();
