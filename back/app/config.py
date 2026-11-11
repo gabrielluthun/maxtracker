@@ -19,6 +19,8 @@ class Settings:
     sync_interval_min: int = 15
     cache_warm_concurrency: int = 8
     search_result_limit: int = 5000
+    # Proxys de confiance devant l'API (Vercel, nginx…) — voir app/core/client_ip.py.
+    trusted_proxy_hops: int = 0
 
     sncf_export_url: str = (
         "https://data.sncf.com/api/explore/v2.1/catalog/datasets/tgvmax/exports/json"
@@ -49,4 +51,5 @@ def get_settings() -> Settings:
         sync_interval_min=_env_int("SYNC_INTERVAL_MIN", 15),
         cache_warm_concurrency=_env_int("CACHE_WARM_CONCURRENCY", 8),
         search_result_limit=_env_int("SEARCH_RESULT_LIMIT", 5000),
+        trusted_proxy_hops=_env_int("TRUSTED_PROXY_HOPS", 0),
     )
