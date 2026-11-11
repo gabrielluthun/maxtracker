@@ -80,6 +80,30 @@ function parseMinutesHHmm(value) {
   return h * 60 + m;
 }
 
+function dayOrdinal(isoDate) {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return Math.round(Date.UTC(y, m - 1, d) / 86_400_000);
+}
+
+/**
+ * Minutes entre maintenant et un départ, tous deux en heure de Paris (heures SNCF),
+ * quel que soit le fuseau du navigateur. Négatif si le train est parti.
+ */
+export function minutesUntilDeparture(date, heureDepart, clock = getParisClock()) {
+  if (!date) return null;
+  const departure = dayOrdinal(date) * 1440 + parseMinutesHHmm(heureDepart);
+  const now = dayOrdinal(clock.today) * 1440 + parseMinutesHHmm(clock.curTime);
+  return departure - now;
+}
+
+export const IMMINENT_MINUTES = 4 * 60;
+
+/** Badge « Imminent » : départ dans moins de 4 h. */
+export function isImminentDeparture(date, heureDepart, clock = getParisClock()) {
+  const minutes = minutesUntilDeparture(date, heureDepart, clock);
+  return minutes != null && minutes > 0 && minutes < IMMINENT_MINUTES;
+}
+
 /** Durée en minutes entre départ et arrivée (trains de nuit : +24 h si arrivée < départ). */
 export function tripDurationMinutes(heureDepart, heureArrivee) {
   const dep = parseMinutesHHmm(heureDepart);
@@ -87,6 +111,12 @@ export function tripDurationMinutes(heureDepart, heureArrivee) {
   let mins = arr - dep;
   if (mins < 0) mins += 24 * 60;
   return mins;
+}
+
+/** Jours entre départ et arrivée (0 = même jour, 1 = lendemain) d'après la durée totale. */
+export function arrivalDayOffset(heureDepart, durationMinutes) {
+  if (durationMinutes == null || durationMinutes < 0) return 0;
+  return Math.floor((parseMinutesHHmm(heureDepart) + durationMinutes) / 1440);
 }
 
 function enrichTripTiming(trip, clock) {
@@ -156,6 +186,7 @@ function matchesCommonFiltersCtx(item, ctx) {
   const { filters, today, horizonLast, maxDuration } = ctx;
   if (item._past) return false;
   if (horizonLast != null && (item.date < today || item.date > horizonLast)) return false;
+  if (filters.selectedDate && item.date !== filters.selectedDate) return false;
   if (filters.departureTodayOnly && !item._today) return false;
   if (filters.weekendOnly && !item._weekend) return false;
   if (!filters.timeSlots[item._slot]) return false;
@@ -246,6 +277,14 @@ export function filterPreparedGroups(preparedGroups, filters, hidden, prevCache 
   }
 
   return { groups: out, totalTrips, cache: nextCache };
+}
+
+/** Départs (directs + premiers trains des correspondances) pour le calendrier et le graphique. */
+export function departuresForCharts(groups) {
+  return groups.flatMap((g) => [
+    ...g.trips,
+    ...(g.connected_trips || []).map((c) => ({ date: c.date, heure_depart: c.heure_depart })),
+  ]);
 }
 
 /** Regroupe directs et correspondances par date, triés par heure de départ. */

@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { calendarDays, mondayFirstWeekdayIndex } from "./tripTime";
+import {
+  arrivalDayOffset,
+  createFilterContext,
+  enrichSearchGroups,
+  filterPreparedGroups,
+  calendarDays,
+  isImminentDeparture,
+  minutesUntilDeparture,
+  mondayFirstWeekdayIndex,
+} from "./tripTime";
 
 describe("calendarDays", () => {
   it("starts on the given Paris date, not the previous UTC day", () => {
@@ -25,5 +34,64 @@ describe("mondayFirstWeekdayIndex", () => {
     expect(mondayFirstWeekdayIndex("2026-11-09")).toBe(0); // lundi
     expect(mondayFirstWeekdayIndex("2026-11-11")).toBe(2); // mercredi
     expect(mondayFirstWeekdayIndex("2026-11-15")).toBe(6); // dimanche
+  });
+});
+
+describe("isImminentDeparture", () => {
+  const lateEvening = { today: "2026-11-11", curTime: "22:30" };
+
+  it("counts minutes in Paris time across midnight", () => {
+    expect(minutesUntilDeparture("2026-11-12", "01:00", lateEvening)).toBe(150);
+    expect(minutesUntilDeparture("2026-11-11", "22:00", lateEvening)).toBe(-30);
+  });
+
+  it("flags departures within the next 4 hours only", () => {
+    expect(isImminentDeparture("2026-11-12", "01:00", lateEvening)).toBe(true);
+    expect(isImminentDeparture("2026-11-11", "22:00", lateEvening)).toBe(false); // parti
+    expect(isImminentDeparture("2026-11-12", "02:30", lateEvening)).toBe(false); // 4 h pile
+    expect(isImminentDeparture("2026-11-13", "08:00", lateEvening)).toBe(false);
+  });
+});
+
+describe("arrivalDayOffset", () => {
+  it("detects next-day arrivals from the total duration", () => {
+    expect(arrivalDayOffset("22:00", 9 * 60 + 30)).toBe(1); // 22:00 → 07:30
+    expect(arrivalDayOffset("07:00", 130)).toBe(0);
+    expect(arrivalDayOffset("23:30", 30)).toBe(1); // arrivée à 00:00 pile
+    expect(arrivalDayOffset("08:00", null)).toBe(0);
+  });
+});
+
+describe("selectedDate filter", () => {
+  const filters = {
+    departureTodayOnly: false,
+    weekendOnly: false,
+    timeSlots: { morning: true, afternoon: true, evening: true },
+    showInoui: true,
+    showIntercites: true,
+    showIntercitesNuit: true,
+    maxConnections: 1,
+    maxDurationMinutes: null,
+    dateHorizonDays: 30,
+    selectedDate: null,
+  };
+  const { today } = createFilterContext(filters);
+  const [y, m, d] = today.split("-").map(Number);
+  const tomorrow = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+  const later = new Date(Date.UTC(y, m - 1, d + 2)).toISOString().slice(0, 10);
+  const trip = (date) => ({ date, heure_depart: "23:59", heure_arrivee: "23:59", train_type: "TGV_INOUI" });
+  const groups = enrichSearchGroups([
+    { destination_city: "Lyon", trips: [trip(tomorrow), trip(later)], connected_trips: [] },
+    { destination_city: "Nice", trips: [trip(later)], connected_trips: [] },
+  ]);
+
+  it("keeps only trips of the chosen day and drops empty groups", () => {
+    const { groups: out, totalTrips } = filterPreparedGroups(groups, { ...filters, selectedDate: tomorrow }, []);
+    expect(out.map((g) => g.destination_city)).toEqual(["Lyon"]);
+    expect(totalTrips).toBe(1);
+  });
+
+  it("shows every day when no day is selected", () => {
+    expect(filterPreparedGroups(groups, filters, []).totalTrips).toBe(3);
   });
 });

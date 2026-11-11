@@ -43,9 +43,11 @@ Pour le détail des filtres, des parcours composés, des horodatages affichés e
 - **Trajets directs** et **parcours avec correspondance** (filtre : direct ou 1 correspondance)
 - **Filtres simples** : type de train, correspondances max
 - **Filtres avancés** : horizon de dates (7 / 14 / 30 j, défaut 30 j), créneaux horaires, durée totale max (≤ 3 h / 5 h / 8 h), départ aujourd'hui, et départ week-end uniquement
-- Vues **Liste**, **Calendrier** (30 jours) et **Pics horaires**
-- Badge **« Départ possible aujourd'hui »**, badge **« Imminent »** (< 4 h)
+- Vues **Liste**, **Calendrier** (sur l'horizon choisi, un clic sur un jour filtre la liste) et **Pics horaires**
+- **Recherche de destination** dans les résultats (« Où voulez-vous aller ? »)
+- Badge **« Départ possible aujourd'hui »**, badge **« Imminent »** (< 4 h), mention **« +1 j »** sur les arrivées le lendemain
 - Gares **favoris**, **masquage** de destinations, **sync manuelle**
+- **Lien partageable** : gare, filtres et vue sont dans l'URL (bouton « Précédent » compris) ; derniers filtres mémorisés d'une visite à l'autre
 - **Mode clair / sombre** (préférence mémorisée, transition en fondu au basculement)
 
 ---
@@ -58,12 +60,14 @@ Ouvrez l'application web, puis :
 2. Lancez la recherche
 3. Parcourez les résultats **par ville de destination** (trains directs et parcours composés, triés par date)
 4. Affinez avec les **filtres** dans le panneau *Filtres simples* / *Filtres avancés* (ou la feuille mobile)
-5. Changez de vue : **Liste**, **Calendrier** ou **Pics horaires**
+5. Cherchez une ville précise avec **« Où voulez-vous aller ? »**, puis changez de vue : **Liste**, **Calendrier** ou **Pics horaires**
 6. Ouvrez **SNCF Connect** depuis chaque train pour réserver (un lien par segment sur les parcours avec correspondance)
 
 **Astuces**
 
 - **Gares favorites** enregistrées localement dans votre navigateur
+- **Partagez une recherche** en copiant l'adresse de la page : elle contient la gare, les filtres et la vue
+- **Calendrier** : cliquez sur un jour pour n'afficher que ses trajets
 - **Masquer** une destination que vous ne voulez plus voir (réversible via « Réafficher tout »)
 - **Correspondances max** : *Direct* par défaut ; passez à *1 correspondance* pour voir les parcours composés
 - **Horizon de dates** : 30 j par défaut ; réduisez à 7 ou 14 j pour alléger la liste
@@ -89,7 +93,9 @@ Ouvrez l'application web, puis :
 | Ne garder que les départs du jour | Filtre *Départ aujourd'hui* |
 | Cibler le week-end ou un créneau | Filtres week-end et horaires |
 | Ne garder que TGV INOUI ou Intercités | Filtres par type de train |
-| Planifier sur le mois | Vue calendrier |
+| Trouver une ville précise | Champ « Où voulez-vous aller ? » |
+| Planifier sur le mois | Vue calendrier (clic sur un jour → trajets de ce jour) |
+| Partager une recherche | Copier l'adresse de la page |
 | Repérer les meilleures heures | Graphique des pics horaires |
 | Réserver | Lien(s) SNCF Connect (par segment si correspondance) |
 

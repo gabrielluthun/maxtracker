@@ -1,6 +1,7 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Info } from "lucide-react";
 import { isWelcomeDismissed, setWelcomeDismissed } from "@/lib/storage";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 
 const EMPHASIS = "text-slate-800 dark:text-slate-200";
 const LINK = "underline text-emerald-800 dark:text-emerald-300/90 hover:text-[#0A2540] dark:hover:text-slate-100";
@@ -23,11 +24,15 @@ export default function WelcomeModal() {
     if (dontShowAgain) setWelcomeDismissed();
     setOpen(false);
   };
+  const confirmRef = useRef(null);
+  // Échap = « J'ai compris » (en respectant la case « Ne plus afficher »).
+  const dialogRef = useDialogFocus(open, onConfirm, { initialFocusRef: confirmRef });
 
   if (!open) return null;
 
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
@@ -85,6 +90,7 @@ export default function WelcomeModal() {
             Ne plus afficher
           </label>
           <button
+            ref={confirmRef}
             type="button"
             onClick={onConfirm}
             className="h-11 w-full sm:w-auto px-8 rounded-xl bg-[#0A2540] hover:bg-[#173A5E] text-white font-semibold tracking-wide shadow-md shadow-black/15 dark:shadow-black/40 transition-colors"

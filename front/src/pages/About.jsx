@@ -357,10 +357,13 @@ export default function About() {
           <li className="pl-1">
             <strong className={STEP_TITLE}>Changez de vue selon votre besoin</strong>
             <p className="m-0 mt-1.5">
-              La vue <strong className={EMPHASIS}>Liste</strong> compare les destinations ; le{" "}
-              <strong className={EMPHASIS}>Calendrier</strong> compte les départs par jour sur 30 jours ;
-              le graphique <strong className={EMPHASIS}>Pics horaires</strong> met en évidence les heures
-              les plus fournies.
+              La vue <strong className={EMPHASIS}>Liste</strong> compare les destinations (le champ{" "}
+              <strong className={EMPHASIS}>« Où voulez-vous aller ? »</strong> retrouve une ville précise) ; le{" "}
+              <strong className={EMPHASIS}>Calendrier</strong> compte les départs par jour sur l&apos;horizon
+              choisi, et un clic sur un jour affiche ses trajets ; le graphique{" "}
+              <strong className={EMPHASIS}>Pics horaires</strong> met en évidence les heures les plus fournies.
+              L&apos;adresse de la page reprend la gare, les filtres et la vue : copiez-la pour partager
+              votre recherche.
             </p>
           </li>
           <li className="pl-1">
