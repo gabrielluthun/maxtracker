@@ -1,39 +1,9 @@
 """Remplacement atomique de la collection trips (staging + renameCollection)."""
 import asyncio
-import os
-import uuid
 
 import pytest
-from pymongo import AsyncMongoClient
-from pymongo.errors import PyMongoError
 
 from app.db.repositories.trips import TRIPS_INDEXES, TripsRepository
-
-MONGO_URL = "mongodb://127.0.0.1:27017"
-
-
-async def _mongo_or_skip():
-    client = AsyncMongoClient(MONGO_URL, serverSelectionTimeoutMS=500)
-    try:
-        await client.admin.command("ping")
-    except PyMongoError:
-        await client.close()
-        if os.environ.get("REQUIRE_MONGO"):
-            raise  # en CI, une base absente est une erreur, pas un test ignoré
-        pytest.skip("MongoDB local indisponible")
-    return client
-
-
-@pytest.fixture
-async def trips_col():
-    client = await _mongo_or_skip()
-    db = client[f"tgvmax_test_{uuid.uuid4().hex[:8]}"]
-    try:
-        yield db.trips
-    finally:
-        await client.drop_database(db.name)
-        await client.close()
-
 
 def _docs(prefix: str, n: int) -> list[dict]:
     return [{"_id": f"{prefix}-{i}", "batch": prefix} for i in range(n)]

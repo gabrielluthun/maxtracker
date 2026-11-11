@@ -131,6 +131,9 @@ class TripsRepository:
         pipeline = [
             {"$match": {"origine_norm": {"$regex": f"^{re.escape(q_norm)}"}}},
             {"$group": {"_id": "$origine"}},
+            # $group ne garantit aucun ordre : sans tri, les suggestions changeaient
+            # d'ordre d'un appel à l'autre (et la liste se réordonnait pendant la frappe).
+            {"$sort": {"_id": 1}},
             {"$limit": limit * 2},
         ]
         cursor = await self._col.aggregate(pipeline)  # PyMongo async : aggregate est une coroutine
