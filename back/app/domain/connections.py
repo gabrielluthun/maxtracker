@@ -1,6 +1,7 @@
 """Composition de parcours avec correspondance (max 1 correspondance en prod)."""
 from __future__ import annotations
 
+from bisect import bisect_left, bisect_right
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date as Date
@@ -296,16 +297,52 @@ def segments_connect(
     return connection_wait_is_valid(leg1, leg2, max_connect_minutes=max_connect_minutes)
 
 
-def build_departures_from_hub_index(
-    segments: Iterable[TripSegment],
-) -> dict[HubDateKey, list[TripSegment]]:
-    index: DefaultDict[HubDateKey, list[TripSegment]] = defaultdict(list)
-    for leg in segments:
-        hub = leg.origine_metropolis
-        if not is_hub_metropolis(hub):
-            continue
-        index[(leg.date, hub)].append(leg)
-    return dict(index)
+class HubDepartureIndex:
+    """Départs depuis chaque hub, triés par horodatage absolu de départ.
+
+    Permet de ne parcourir que les trains partant dans la fenêtre d'attente
+    possible (recherche dichotomique) au lieu de tous les départs du jour.
+    """
+
+    def __init__(self, segments: Iterable[TripSegment]) -> None:
+        by_hub: DefaultDict[str, list[tuple[int, TripSegment]]] = defaultdict(list)
+        for leg in segments:
+            hub = leg.origine_metropolis
+            if not is_hub_metropolis(hub):
+                continue
+            dep = departure_abs_minutes(leg)
+            if dep is None:
+                continue
+            by_hub[hub].append((dep, leg))
+        self._keys: dict[str, list[int]] = {}
+        self._legs: dict[str, list[TripSegment]] = {}
+        for hub, items in by_hub.items():
+            items.sort(key=lambda item: item[0])  # tri stable : ordre d'origine à égalité
+            self._keys[hub] = [dep for dep, _ in items]
+            self._legs[hub] = [leg for _, leg in items]
+
+    def departures_between(self, hub: str, start: int, end: int) -> list[TripSegment]:
+        """Départs de `hub` dont l'horodatage absolu est dans [start, end]."""
+        keys = self._keys.get(hub)
+        if not keys:
+            return []
+        return self._legs[hub][bisect_left(keys, start) : bisect_right(keys, end)]
+
+    def connections_from(
+        self, leg: TripSegment, *, max_connect_minutes: int
+    ) -> list[TripSegment]:
+        """Candidats au départ du hub d'arrivée de `leg`, dans la fenêtre d'attente.
+
+        La borne basse est l'attente minimale la plus courte (même gare) ;
+        `connection_wait_is_valid` affine ensuite selon le type de changement.
+        """
+        hub = leg.destination_metropolis
+        arr = arrival_abs_minutes(leg)
+        if not hub or arr is None:
+            return []
+        return self.departures_between(
+            hub, arr + MIN_CONNECT_SAME_STATION, arr + max_connect_minutes
+        )
 
 
 def _journey_from_legs(legs: tuple[TripSegment, ...]) -> ConnectedJourney:
@@ -323,7 +360,7 @@ def _journey_from_legs(legs: tuple[TripSegment, ...]) -> ConnectedJourney:
 
 def _find_two_leg_journeys(
     first_legs: Sequence[TripSegment],
-    index: dict[HubDateKey, list[TripSegment]],
+    index: HubDepartureIndex,
     *,
     origin_metropolis: Optional[str],
     max_connect_minutes: int,
@@ -334,28 +371,25 @@ def _find_two_leg_journeys(
     for leg1 in first_legs:
         if not is_viable_first_leg(leg1, origin_metropolis=origin_metropolis):
             continue
-        hub = leg1.destination_metropolis
-        assert hub is not None
-        for day in candidate_connection_dates(leg1, max_connect_minutes=max_connect_minutes):
-            for leg2 in index.get((day, hub), ()):
-                if not is_viable_hub_departure_leg(leg2):
-                    continue
-                if not segments_connect(leg1, leg2, max_connect_minutes=max_connect_minutes):
-                    continue
-                if not is_meaningful_journey(leg1, leg2):
-                    continue
-                journey = _journey_from_legs((leg1, leg2))
-                fp = journey.fingerprint
-                if fp in seen:
-                    continue
-                seen.add(fp)
-                out.append(journey)
+        for leg2 in index.connections_from(leg1, max_connect_minutes=max_connect_minutes):
+            if not is_viable_hub_departure_leg(leg2):
+                continue
+            if not segments_connect(leg1, leg2, max_connect_minutes=max_connect_minutes):
+                continue
+            if not is_meaningful_journey(leg1, leg2):
+                continue
+            journey = _journey_from_legs((leg1, leg2))
+            fp = journey.fingerprint
+            if fp in seen:
+                continue
+            seen.add(fp)
+            out.append(journey)
     return out
 
 
 def _extend_to_three_legs(
     two_leg: Sequence[ConnectedJourney],
-    index: dict[HubDateKey, list[TripSegment]],
+    index: HubDepartureIndex,
     *,
     max_connect_minutes: int,
     seen: set[str],
@@ -363,26 +397,22 @@ def _extend_to_three_legs(
     out: list[ConnectedJourney] = []
     for journey in two_leg:
         leg2 = journey.legs[-1]
-        hub = leg2.destination_metropolis
-        if not hub:
-            continue
-        for day in candidate_connection_dates(leg2, max_connect_minutes=max_connect_minutes):
-            for leg3 in index.get((day, hub), ()):
-                if not is_viable_hub_departure_leg(leg3):
-                    continue
-                if not segments_connect(leg2, leg3, max_connect_minutes=max_connect_minutes):
-                    continue
-                if not is_meaningful_journey(journey.legs[0], leg3):
-                    continue
-                if leg3.segment_id in {leg.segment_id for leg in journey.legs}:
-                    continue
-                legs3 = (*journey.legs, leg3)
-                j3 = _journey_from_legs(legs3)
-                fp = j3.fingerprint
-                if fp in seen:
-                    continue
-                seen.add(fp)
-                out.append(j3)
+        for leg3 in index.connections_from(leg2, max_connect_minutes=max_connect_minutes):
+            if not is_viable_hub_departure_leg(leg3):
+                continue
+            if not segments_connect(leg2, leg3, max_connect_minutes=max_connect_minutes):
+                continue
+            if not is_meaningful_journey(journey.legs[0], leg3):
+                continue
+            if leg3.segment_id in {leg.segment_id for leg in journey.legs}:
+                continue
+            legs3 = (*journey.legs, leg3)
+            j3 = _journey_from_legs(legs3)
+            fp = j3.fingerprint
+            if fp in seen:
+                continue
+            seen.add(fp)
+            out.append(j3)
     return out
 
 
@@ -399,7 +429,7 @@ def find_all_connected_journeys(
     if max_connections == 0:
         return []
 
-    index = build_departures_from_hub_index(hub_departure_legs)
+    index = HubDepartureIndex(hub_departure_legs)
     seen: set[str] = set()
     out: list[ConnectedJourney] = []
 
