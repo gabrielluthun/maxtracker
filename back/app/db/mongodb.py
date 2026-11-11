@@ -27,5 +27,9 @@ class Database:
             await self.trips.create_index(keys)
         await self.search_cache.create_index("sync_at")
 
+    async def ping(self) -> None:
+        """Lève une exception si MongoDB ne répond pas."""
+        await self._client.admin.command("ping")
+
     async def close(self) -> None:
         self._client.close()
