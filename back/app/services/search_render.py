@@ -74,6 +74,8 @@ def render_trip(
         for field in COMPACT_TRIP_DROP:
             out.pop(field, None)
         out.pop("sncf_connect_url", None)
+        if not out.get("is_new"):
+            out.pop("is_new", None)  # absent = pas nouveau
     else:
         out["sncf_connect_url"] = connect_url(out)
     return out
@@ -89,6 +91,8 @@ def render_journey(
     if compact:
         for field in COMPACT_JOURNEY_DROP:
             out.pop(field, None)
+        if not out.get("is_new"):
+            out.pop("is_new", None)
     return out
 
 

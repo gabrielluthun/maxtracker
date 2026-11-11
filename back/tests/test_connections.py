@@ -369,3 +369,24 @@ class TestOvernightAndMidnight(unittest.TestCase):
                     heure_depart="10:00")
         self.assertFalse(segments_connect(leg1, leg2))
         self.assertEqual(candidate_connection_dates(leg1), ())
+
+
+class TestNewJourneys(unittest.TestCase):
+    def test_journey_is_new_when_any_leg_is_new(self):
+        from app.services.connections import connected_trip_out_from_journey
+
+        leg1 = _seg(origine_metropolis="Lille", destination_metropolis="Paris", heure_arrivee="09:30")
+        leg2 = _seg(
+            train_no="2", origine="PARIS (intramuros)", heure_depart="10:30", heure_arrivee="12:00",
+            origine_metropolis="Paris", destination_metropolis="Lyon", is_new=True,
+        )
+        journey = find_all_connected_journeys([leg1], [leg2], origin_metropolis="Lille")[0]
+        out = connected_trip_out_from_journey(
+            journey, sncf_connect_base="https://www.sncf-connect.com", price_checked_at="t"
+        )
+        self.assertTrue(out.is_new)
+        self.assertEqual([leg.is_new for leg in out.legs], [False, True])
+
+    def test_segment_reads_is_new_from_trip_doc(self):
+        self.assertTrue(segment_from_trip_doc({"is_new": True}).is_new)
+        self.assertFalse(segment_from_trip_doc({}).is_new)

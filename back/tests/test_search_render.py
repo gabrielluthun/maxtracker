@@ -179,3 +179,19 @@ def test_render_does_not_mutate_cached_payload():
     render_search_payload(payload, origin="Paris", connect_url=_url, now=NOW, compact=True,
                           connections=False)
     assert payload == _payload()
+
+
+def test_compact_keeps_only_true_is_new_flags():
+    payload = _payload()
+    payload["groups"][1]["trips"][0]["is_new"] = True
+    payload["groups"][1]["trips"][1]["is_new"] = False
+    payload["groups"][0]["connected_trips"][0]["is_new"] = True
+    out = render_search_payload(payload, origin="Paris", connect_url=_url, now=NOW, compact=True)
+    marseille = next(g for g in out["groups"] if g["destination_city"] == "Marseille")
+    assert marseille["trips"][0]["is_new"] is True
+    assert "is_new" not in marseille["trips"][1]
+    lyon = next(g for g in out["groups"] if g["destination_city"] == "Lyon")
+    assert lyon["connected_trips"][0]["is_new"] is True
+    assert "is_new" not in lyon["connected_trips"][1]
+    full = render_search_payload(payload, origin="Paris", connect_url=_url, now=NOW)
+    assert next(g for g in full["groups"] if g["destination_city"] == "Marseille")["trips"][1]["is_new"] is False

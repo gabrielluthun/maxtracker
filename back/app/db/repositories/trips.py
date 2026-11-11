@@ -37,6 +37,7 @@ class TripsRepository:
         "synced_at": 0,
         "entity": 0,
         "od_happy_card": 0,
+        "first_seen": 0,  # seul `is_new` sert aux recherches
     }
 
     def __init__(self, collection) -> None:

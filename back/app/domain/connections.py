@@ -40,6 +40,7 @@ class TripSegment:
     destination_iata: Optional[str] = None
     axe: str = ""
     departure_datetime: str = ""
+    is_new: bool = False
 
 
 @dataclass(frozen=True)
@@ -529,6 +530,7 @@ def segment_from_trip_doc(doc: dict) -> TripSegment:
         destination_iata=doc.get("destination_iata"),
         axe=doc.get("axe") or "",
         departure_datetime=doc.get("departure_datetime", ""),
+        is_new=bool(doc.get("is_new")),
     )
 
 
