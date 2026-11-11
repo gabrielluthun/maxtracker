@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Search, Star, X, MapPin, Loader2 } from "lucide-react";
 import { searchStations } from "@/lib/api";
 import { getFavorites, toggleFavorite } from "@/lib/storage";
@@ -17,6 +17,10 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
   const wrapRef = useRef(null);
   const cacheRef = useRef(new Map());
   const prefetchSearch = usePrefetchSearch();
+  const inputId = useId();
+  const listboxId = useId();
+  const optionId = (i) => `${listboxId}-option-${i}`;
+  const listOpen = open && suggestions.length > 0;
 
   useEffect(() => { setQuery(origin?.name || ""); }, [origin]);
 
@@ -58,7 +62,9 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
           setSuggestions(res);
         }
       } catch (e) {
-        if (active && e?.code !== "ERR_CANCELED") throw e;
+        // Requête annulée (frappe suivante) : normal. Autre erreur : liste vide,
+        // au lieu d'une exception non rattrapée dans le setTimeout.
+        if (active && e?.code !== "ERR_CANCELED") setSuggestions([]);
       } finally {
         if (active) setStationsLoading(false);
       }
@@ -79,12 +85,20 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
     onSearch(station);
   };
 
+  // Motif « combobox » : le focus reste dans le champ, les flèches parcourent la liste.
   const onKeyDown = (e) => {
-    if (!open) return;
+    if (!open) {
+      if (e.key === "ArrowDown" && suggestions.length > 0) { e.preventDefault(); setOpen(true); setActive(0); }
+      return;
+    }
     if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.min(a + 1, suggestions.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
-    else if (e.key === "Enter" && active >= 0) { e.preventDefault(); pick(suggestions[active]); }
-    else if (e.key === "Escape") setOpen(false);
+    else if (e.key === "Enter" && suggestions.length > 0) {
+      // Entrée sans sélection : première suggestion.
+      e.preventDefault();
+      pick(suggestions[Math.max(active, 0)]);
+    }
+    else if (e.key === "Escape") { setOpen(false); setActive(-1); }
   };
 
   const fav = origin ? !!favs.find((f) => f.raw === origin.raw) : false;
@@ -100,16 +114,23 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
   return (
     <div className="w-full" ref={wrapRef}>
       <div className="bg-white rounded-2xl shadow-[0_24px_60px_-24px_rgba(10,37,64,0.25)] border border-slate-200 p-4 md:p-6">
-        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+        <label htmlFor={inputId} className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
           Gare de départ
         </label>
         <div className="flex flex-col md:flex-row gap-3 md:items-center">
           <div className="flex-1 min-w-0 relative">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" strokeWidth={2.25} />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" strokeWidth={2.25} aria-hidden="true" />
               <input
+                id={inputId}
                 data-testid="search-input"
                 type="text"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={listOpen}
+                aria-controls={listboxId}
+                aria-activedescendant={listOpen && active >= 0 ? optionId(active) : undefined}
+                autoComplete="off"
                 value={query}
                 onChange={(e) => { setQuery(e.target.value); setOpen(true); setActive(-1); }}
                 onFocus={() => setOpen(true)}
@@ -126,8 +147,11 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
                 />
               ) : origin ? (
                 <button
+                  type="button"
                   data-testid="favorite-btn"
                   onClick={onFav}
+                  aria-pressed={fav}
+                  aria-label={fav ? "Retirer des favoris" : "Ajouter aux favoris"}
                   className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-amber-50 transition-colors"
                   title={fav ? "Retirer des favoris" : "Ajouter aux favoris"}
                 >
@@ -135,11 +159,24 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
                 </button>
               ) : null}
             </div>
-            {open && suggestions.length > 0 && (
-              <div className="absolute z-30 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto" data-testid="suggestions-list">
+            {listOpen && (
+              <div
+                id={listboxId}
+                role="listbox"
+                aria-label="Gares correspondantes"
+                className="absolute z-30 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto"
+                data-testid="suggestions-list"
+              >
                 {suggestions.map((s, i) => (
                   <button
                     key={`${s.raw}-${i}`}
+                    id={optionId(i)}
+                    type="button"
+                    role="option"
+                    aria-selected={active === i}
+                    tabIndex={-1}
+                    // Garde le focus dans le champ pendant le clic.
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => pick(s)}
                     onMouseEnter={() => setActive(i)}
                     className={cn(
@@ -148,8 +185,15 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
                     )}
                     data-testid={`suggestion-${i}`}
                   >
-                    <MapPin className="h-4 w-4 text-slate-400" strokeWidth={2} />
-                    <span className="flex-1 text-slate-800">{s.name}</span>
+                    <MapPin className="h-4 w-4 text-slate-400" strokeWidth={2} aria-hidden="true" />
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-slate-800">{s.name}</span>
+                      {s.hint && (
+                        <span className="block text-xs text-slate-500" data-testid={`suggestion-hint-${i}`}>
+                          {s.hint}
+                        </span>
+                      )}
+                    </span>
                     {s.is_metropolis && (
                       <span className="text-[10px] uppercase tracking-wider bg-[#0A2540] text-white px-2 py-0.5 rounded-full font-semibold">Métropole</span>
                     )}
@@ -160,6 +204,7 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
             {open && query.length >= 3 && stationsLoading && (
               <div
                 className="absolute z-30 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl p-4 text-sm text-slate-500 flex items-center gap-2"
+                role="status"
                 data-testid="suggestions-loading"
               >
                 <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
@@ -167,7 +212,7 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
               </div>
             )}
             {open && query.length >= 3 && !stationsLoading && suggestions.length === 0 && (
-              <div className="absolute z-30 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl p-4 text-sm text-slate-500" data-testid="suggestions-empty">
+              <div className="absolute z-30 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl p-4 text-sm text-slate-500" role="status" data-testid="suggestions-empty">
                 Aucune gare trouvée pour « {query} »
               </div>
             )}

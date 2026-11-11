@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { toast } from "sonner";
 import AppHeader from "@/components/AppHeader";
 import SyncBadge from "@/components/SyncBadge";
 import Home from "@/pages/Home";
-import About from "@/pages/About";
 import { getSyncInfo, triggerSync } from "@/lib/api";
 import { APP_VIEW, viewFromHash } from "@/lib/appView";
+
+const About = lazy(() => import("@/pages/About"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,6 +20,12 @@ const queryClient = new QueryClient({
 
 const SYNC_COOLDOWN_MS = 3 * 60 * 1000;
 const SYNC_HEARTBEAT_MS = 60 * 1000;
+
+/** Délai annoncé par le serveur (en-tête Retry-After, en secondes) après un 429. */
+function retryAfterMs(headerValue) {
+  const seconds = Number.parseInt(headerValue, 10);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : SYNC_COOLDOWN_MS;
+}
 
 function nextSyncPollDelay(info) {
   if (!info?.next_sync_at) return SYNC_HEARTBEAT_MS;
@@ -75,14 +82,25 @@ export default function AppRouter() {
     if (refreshing || Date.now() < cooldownUntil) return;
     setRefreshing(true);
     try {
-      await triggerSync();
+      const result = await triggerSync();
       const info = await getSyncInfo();
       setSyncInfo(info);
       setCooldownUntil(Date.now() + SYNC_COOLDOWN_MS);
-      toast.success("Synchronisation effectuée");
-      rerunSearchRef.current?.();
-    } catch {
-      toast.error("Synchronisation impossible");
+      if (result?.status === "skipped" && result?.reason === "sync_in_progress") {
+        toast.info("Une synchronisation est déjà en cours");
+      } else if (result?.status === "error") {
+        toast.error("Données SNCF indisponibles — les données actuelles sont conservées");
+      } else {
+        toast.success("Synchronisation effectuée");
+        rerunSearchRef.current?.();
+      }
+    } catch (err) {
+      if (err?.response?.status === 429) {
+        setCooldownUntil(Date.now() + retryAfterMs(err.response.headers?.["retry-after"]));
+        toast.info("Une synchronisation vient d'être lancée. Réessayez un peu plus tard.");
+      } else {
+        toast.error("Synchronisation impossible");
+      }
     } finally {
       setRefreshing(false);
     }
@@ -107,7 +125,9 @@ export default function AppRouter() {
           }
         />
         {view === APP_VIEW.ABOUT ? (
-          <About />
+          <Suspense fallback={<div className="min-h-[60vh]" aria-busy="true" />}>
+            <About />
+          </Suspense>
         ) : (
           <Home syncInfo={syncInfo} registerRerunSearch={registerRerunSearch} />
         )}

@@ -25,3 +25,7 @@ class SyncStateRepository:
     async def get_sncf_data_updated_at(self) -> Optional[str]:
         doc = await self.get()
         return doc.get("sncf_data_updated_at")
+
+    async def get_pipeline_version(self) -> Optional[int]:
+        doc = await self.get()
+        return doc.get("pipeline_version")

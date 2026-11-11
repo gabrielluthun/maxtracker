@@ -1,7 +1,16 @@
 import { memo } from "react";
 import { ExternalLink, Train, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatTripDayLabel } from "@/lib/tripTime";
+import NewBadge from "@/components/NewBadge";
+import NextDayMark from "@/components/NextDayMark";
+import {
+  arrivalDayOffset,
+  formatTripDayLabel,
+  isImminentDeparture,
+  tripDurationMinutes,
+} from "@/lib/tripTime";
+import { tripConnectUrl } from "@/lib/sncfConnect";
+import { tripKey } from "@/lib/tripKeys";
 
 const TRAIN_TYPE_STYLES = {
   TGV_INOUI: { ribbon: "bg-[#E11D48]", badge: "bg-[#E11D48] text-white", label: "TGV INOUI" },
@@ -24,15 +33,6 @@ function durationStr(dep, arr) {
   return `${h}h${m.toString().padStart(2, "0")}`;
 }
 
-function isImminent(date, heure) {
-  try {
-    const dt = new Date(`${date}T${heure}:00`);
-    const diff = dt.getTime() - Date.now();
-    return diff > 0 && diff < 4 * 3600 * 1000;
-  } catch {
-    return false;
-  }
-}
 
 function formatFare(fareEur) {
   if (fareEur === 0 || fareEur === 0.0) return "0€";
@@ -41,7 +41,11 @@ function formatFare(fareEur) {
 
 function TrainCard({ trip, label }) {
   const style = TRAIN_TYPE_STYLES[trip.train_type] || TRAIN_TYPE_STYLES.TGV_INOUI;
-  const imminent = isImminent(trip.date, trip.heure_depart);
+  const imminent = isImminentDeparture(trip.date, trip.heure_depart);
+  const arrivalOffset = arrivalDayOffset(
+    trip.heure_depart,
+    tripDurationMinutes(trip.heure_depart, trip.heure_arrivee)
+  );
   const dayLabel = formatTripDayLabel(trip.date);
   const fare = trip.fare_eur ?? 0;
   const origineLabel = trip.origine_label || trip.origine;
@@ -49,7 +53,7 @@ function TrainCard({ trip, label }) {
 
   return (
     <div
-      data-testid={`train-card-${trip.id}`}
+      data-testid={`train-card-${tripKey(trip)}`}
       className="card-hover bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden flex flex-col sm:flex-row"
     >
       <div className={cn("sm:w-2 h-2 sm:h-auto", style.ribbon)} />
@@ -78,7 +82,9 @@ function TrainCard({ trip, label }) {
 
         <div className="sm:text-right">
           <div className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold mb-0.5">Arrivée</div>
-          <div className="font-mono text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{fmtHHmm(trip.heure_arrivee)}</div>
+          <div className="font-mono text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{fmtHHmm(trip.heure_arrivee)}
+            <NextDayMark offset={arrivalOffset} />
+          </div>
           <div className="text-sm text-slate-600 dark:text-slate-400 mt-0.5 line-clamp-1">{destinationLabel}</div>
         </div>
 
@@ -98,10 +104,11 @@ function TrainCard({ trip, label }) {
                 <Zap className="h-3 w-3" strokeWidth={2.5} /> Imminent
               </span>
             )}
+            {trip.is_new && <NewBadge />}
           </div>
           <a
             data-testid="sncf-connect-link"
-            href={trip.sncf_connect_url}
+            href={tripConnectUrl(trip)}
             target="_blank"
             rel="noopener noreferrer"
             title={`Réserver sur SNCF Connect : ${origineLabel} → ${destinationLabel}, ${dayLabel} à ${fmtHHmm(trip.heure_depart)}`}

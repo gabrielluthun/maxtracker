@@ -5,6 +5,7 @@ import {
   ChevronDown,
   Clock4,
   Hourglass,
+  Sparkles,
   Train,
   Filter,
   RotateCw,
@@ -32,6 +33,7 @@ const TIME_SLOTS = [
 function hasSimpleFiltersActive(filters) {
   if (!filters.showInoui || !filters.showIntercites || !filters.showIntercitesNuit) return true;
   if ((filters.maxConnections ?? 0) !== 0) return true;
+  if (filters.newOnly) return true;
   return false;
 }
 
@@ -100,6 +102,8 @@ function CollapsibleFilterSection({
             )}
             data-testid={sectionTestId}
             aria-hidden={!open}
+            // Section repliée : ses boutons ne doivent pas recevoir le focus au clavier.
+            inert={!open}
           >
             {children}
           </div>
@@ -183,6 +187,23 @@ function FiltersPanel({ filters, onChange, hiddenCount, onResetHidden, totalDest
           sectionTestId="filters-simple-section"
           badgeTestId="filters-simple-active-badge"
         >
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 font-medium text-slate-800 dark:text-slate-100">
+                <Sparkles className="h-4 w-4 text-violet-600 dark:text-violet-400" aria-hidden="true" /> Nouveautés uniquement
+              </div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Places apparues dans les dernières 24 h
+              </div>
+            </div>
+            <Switch
+              data-testid="filter-new"
+              aria-label="Nouveautés uniquement"
+              checked={!!filters.newOnly}
+              onCheckedChange={(v) => set("newOnly", v)}
+            />
+          </div>
+
           <div>
             <div className="flex items-center gap-2 font-medium text-slate-800 dark:text-slate-100 mb-2">
               <Train className="h-4 w-4 text-slate-500 dark:text-slate-400" /> Type de train

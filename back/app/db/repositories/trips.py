@@ -1,9 +1,21 @@
 """MongoDB access for the trips collection."""
-import re
-from typing import Any, Iterable
+import logging
+from typing import Any, Iterable, Optional
 
 from app.domain.stations import HUB_METROPOLISES, trip_id
 from app.domain.trips import paris_cleanup_cutoff
+
+logger = logging.getLogger("maxtracker")
+
+# Index de la collection trips — recréés sur la collection de staging avant la
+# bascule, car rename(dropTarget=True) remplace aussi les index de la cible.
+TRIPS_INDEXES: tuple[list[tuple[str, int]], ...] = (
+    [("origine_norm", 1), ("departure_datetime", 1)],
+    [("origine_metropolis", 1), ("departure_datetime", 1)],
+    [("date", 1), ("origine_metropolis", 1), ("departure_datetime", 1)],
+    [("date", 1), ("heure_depart", 1)],
+    [("origine_norm", 1), ("origine", 1)],
+)
 
 
 def _active_departure_filter() -> dict[str, Any]:
@@ -25,6 +37,7 @@ class TripsRepository:
         "synced_at": 0,
         "entity": 0,
         "od_happy_card": 0,
+        "first_seen": 0,  # seul `is_new` sert aux recherches
     }
 
     def __init__(self, collection) -> None:
@@ -34,11 +47,30 @@ class TripsRepository:
         return await self._col.count_documents({})
 
     async def replace_all(self, docs: list[dict], *, chunk_size: int = 5000) -> None:
-        await self._col.delete_many({})
+        """Remplace tout le contenu de façon atomique pour les lecteurs.
+
+        Les documents sont écrits dans `<trips>_staging`, indexés, puis la
+        collection est basculée par un seul `renameCollection` : une recherche
+        concurrente voit soit l'ancien jeu complet, soit le nouveau, jamais une
+        collection vide ou à moitié remplie.
+        """
+        if not docs:
+            await self._col.delete_many({})
+            return
+        staging = self._col.database[f"{self._col.name}_staging"]
+        await staging.drop()  # reste d'une sync interrompue
         for i in range(0, len(docs), chunk_size):
             batch = docs[i : i + chunk_size]
             if batch:
-                await self._col.insert_many(batch, ordered=False)
+                await staging.insert_many(batch, ordered=False)
+        for keys in TRIPS_INDEXES:
+            await staging.create_index(keys)
+        await staging.rename(self._col.name, dropTarget=True)
+
+    async def first_seen_by_id(self) -> dict[str, Optional[str]]:
+        """Date d'apparition connue de chaque trajet en base (avant remplacement)."""
+        cursor = self._col.find({}, {"first_seen": 1})
+        return {d["_id"]: d.get("first_seen") for d in await cursor.to_list(None)}
 
     async def cleanup_past(self) -> int:
         today, cur_time = paris_cleanup_cutoff()
@@ -51,21 +83,36 @@ class TripsRepository:
         await self._col.delete_many({"date": today, "heure_depart": {"$lt": cur_time}})
 
     async def find_by_query(
-        self, query: dict[str, Any], *, limit: int = 5000
+        self, query: dict[str, Any], *, limit: Optional[int] = None
     ) -> list[dict]:
+        """Trajets à venir correspondant à `query`, triés par heure de départ.
+
+        `limit` est un garde-fou mémoire : s'il est atteint, les départs les plus
+        tardifs manquent. On le signale toujours dans les logs — une troncature
+        silencieuse a déjà fait disparaître ~11 000 correspondances.
+        """
         full_query = {"$and": [query, _active_departure_filter()]}
         cursor = self._col.find(full_query, self._PROJECTION).sort(
             [("departure_datetime", 1)]
         )
-        return await cursor.to_list(limit)
+        rows = await cursor.to_list(limit)
+        if limit is not None and len(rows) >= limit:
+            logger.warning(
+                "trips query hit limit=%d: later departures are missing from the results", limit
+            )
+        return rows
 
     async def find_departures_from_hub_date_keys(
         self,
         keys: Iterable[tuple[str, str]],
         *,
-        limit: int = 8000,
         chunk_size: int = 80,
     ) -> list[dict]:
+        """Tous les départs à venir des couples (date, hub) demandés.
+
+        Pas de plafond : le volume est borné par les clés (≤ 31 jours × hubs),
+        soit ~15 000 documents au pire (Paris).
+        """
         clauses: list[dict[str, Any]] = []
         for date, hub in keys:
             if date and hub in HUB_METROPOLISES:
@@ -77,7 +124,7 @@ class TripsRepository:
         for i in range(0, len(clauses), chunk_size):
             batch = clauses[i : i + chunk_size]
             query: dict[str, Any] = batch[0] if len(batch) == 1 else {"$or": batch}
-            rows = await self.find_by_query(query, limit=limit)
+            rows = await self.find_by_query(query)
             for row in rows:
                 sid = trip_id(
                     row.get("train_no", ""),
@@ -103,11 +150,10 @@ class TripsRepository:
         vals = await self._col.distinct("origine_metropolis")
         return [v for v in vals if v]
 
-    async def search_origines(self, q_norm: str, *, limit: int) -> list[str]:
-        pipeline = [
-            {"$match": {"origine_norm": {"$regex": f"^{re.escape(q_norm)}"}}},
-            {"$group": {"_id": "$origine"}},
-            {"$limit": limit * 2},
-        ]
-        rows = await self._col.aggregate(pipeline).to_list(limit * 2)
-        return [r["_id"] for r in rows]
+    async def origin_codes(self) -> list[dict]:
+        """Couples distincts {origine, iata} : base de l'index de recherche des gares."""
+        cursor = await self._col.aggregate(
+            [{"$group": {"_id": {"origine": "$origine", "iata": "$origine_iata"}}}]
+        )
+        rows = await cursor.to_list(None)
+        return [{"origine": r["_id"].get("origine"), "iata": r["_id"].get("iata")} for r in rows]

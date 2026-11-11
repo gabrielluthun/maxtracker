@@ -42,3 +42,34 @@ class SearchMemoryCache:
 
     def clear(self) -> None:
         self._store.clear()
+
+
+class RenderedResponseCache:
+    """Petit LRU de réponses /search déjà sérialisées et compressées (gzip).
+
+    La clé inclut la minute courante (Paris) : les trains partis sont retirés
+    au plus une minute après leur départ, comme avant, mais la mise en forme
+    (libellés, liens, JSON, gzip) n'est refaite qu'une fois par minute.
+    """
+
+    def __init__(self, *, max_size: int = 64) -> None:
+        self._max_size = max_size
+        self._store: OrderedDict[tuple, bytes] = OrderedDict()
+
+    def get(self, key: tuple) -> Optional[bytes]:
+        body = self._store.get(key)
+        if body is not None:
+            self._store.move_to_end(key)
+        return body
+
+    def set(self, key: tuple, body: bytes) -> None:
+        self._store[key] = body
+        self._store.move_to_end(key)
+        while len(self._store) > self._max_size:
+            self._store.popitem(last=False)
+
+    def clear(self) -> None:
+        self._store.clear()
+
+    def __len__(self) -> int:
+        return len(self._store)

@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useDeferredValue,
@@ -8,64 +10,89 @@ import {
   useTransition,
 } from "react";
 import { toast } from "sonner";
-import { List, CalendarDays, BarChart3, Sparkles, AlertCircle, Inbox } from "lucide-react";
+import { List, CalendarDays, BarChart3, Sparkles, AlertCircle, Inbox, Search, X } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import FiltersPanel from "@/components/FiltersPanel";
 import MobileFiltersSheet from "@/components/MobileFiltersSheet";
 import {
   DEFAULT_DATE_HORIZON_DAYS,
+  countNewItems,
+  departuresForCharts,
   enrichSearchGroups,
   filterPreparedGroups,
+  formatTripDayLabel,
 } from "@/lib/tripTime";
 import DestinationGroup from "@/components/DestinationGroup";
 import DestinationGroupSkeleton from "@/components/DestinationGroupSkeleton";
 import CalendarView from "@/components/CalendarView";
-import PeakHoursChart from "@/components/PeakHoursChart";
 import Disclaimer from "@/components/Disclaimer";
 import WelcomeModal from "@/components/WelcomeModal";
+import { NEW_TRIP_TITLE } from "@/components/NewBadge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSearchTrips } from "@/hooks/useSearchTrips";
-import { getHidden, unhideDestination, hideDestination } from "@/lib/storage";
+import {
+  clearHidden,
+  getHidden,
+  getSavedFilters,
+  hideDestination,
+  saveFilters,
+  unhideDestination,
+} from "@/lib/storage";
+import {
+  filtersToRemember,
+  filtersWithDefaults,
+  parseSearchState,
+  serializeSearchState,
+} from "@/lib/urlState";
+import { filterGroupsByDestination } from "@/lib/destinationSearch";
 import { cn } from "@/lib/utils";
+// Illustration de l'accueil, hébergée avec l'app (WebP, 16 Ko au lieu d'un PNG de 690 Ko).
+import emptyStateImage from "@/assets/empty-state.webp";
 
-const HERO_BG = "https://static.prod-images.emergentagent.com/jobs/f74c49b6-18a0-4cb7-95f4-30d605669f9b/images/cfaaa1f6fd3ab022112caad3ff0c854d3d7487ef5ce8eb07cef5ff782c6cb730.png";
-const EMPTY_BG = "https://static.prod-images.emergentagent.com/jobs/f74c49b6-18a0-4cb7-95f4-30d605669f9b/images/a8fc6da684e5f05873d772644a95f43d0c632d9f05c9468e3746d24581b9fbec.png";
+// Recharts (~la moitié du JavaScript de l'app) n'est chargé qu'à l'ouverture de l'onglet.
+const PeakHoursChart = lazy(() => import("@/components/PeakHoursChart"));
 
-const defaultFilters = {
-  departureTodayOnly: false,
-  weekendOnly: false,
-  timeSlots: { morning: true, afternoon: true, evening: true },
-  showInoui: true,
-  showIntercites: true,
-  showIntercitesNuit: true,
-  maxConnections: 0,
-  maxDurationMinutes: null,
-  dateHorizonDays: DEFAULT_DATE_HORIZON_DAYS,
-};
+
+/**
+ * État de recherche d'après l'URL. Un lien partagé (avec `gare`) impose ses filtres ;
+ * sans gare dans l'URL, on reprend les derniers filtres utilisés sur cet appareil.
+ */
+function searchStateFromLocation() {
+  const state = parseSearchState(window.location.search);
+  if (!state.station) state.filters = filtersWithDefaults(getSavedFilters() ?? {});
+  return state;
+}
 
 const MOBILE_INITIAL_DESTINATIONS = 10;
 const MOBILE_DESTINATIONS_STEP = 5;
 
 export default function Home({ syncInfo, registerRerunSearch }) {
-  const [origin, setOrigin] = useState(null);
-  const [searchOrigin, setSearchOrigin] = useState(null);
-  const [filters, setFilters] = useState(defaultFilters);
+  const [initial] = useState(searchStateFromLocation);
+  const [origin, setOrigin] = useState(initial.station);
+  const [searchOrigin, setSearchOrigin] = useState(initial.station?.raw ?? null);
+  const [filters, setFilters] = useState(initial.filters);
   const deferredFilters = useDeferredValue(filters);
   const [isPending, startTransition] = useTransition();
   const [animateResults, setAnimateResults] = useState(false);
   const [hidden, setHidden] = useState(getHidden());
-  const [tab, setTab] = useState("list");
+  const [tab, setTab] = useState(initial.tab);
+  const [destQuery, setDestQuery] = useState(initial.destQuery);
+  const deferredDestQuery = useDeferredValue(destQuery);
   const [mobileVisibleDestinations, setMobileVisibleDestinations] = useState(MOBILE_INITIAL_DESTINATIONS);
 
+  // Les correspondances (~85 % du volume) ne sont chargées que si le filtre les affiche.
+  const wantConnections = filters.maxConnections > 0;
   const {
     data,
     isLoading,
     isFetching,
+    isPlaceholderData,
     isError,
     error,
     refetch,
-  } = useSearchTrips(searchOrigin, { enabled: !!searchOrigin });
+  } = useSearchTrips(searchOrigin, { enabled: !!searchOrigin, connections: wantConnections });
+  const loadingConnections = wantConnections && isPlaceholderData && isFetching;
 
   const loading = isLoading;
   const refreshing = isFetching && !!data;
@@ -87,7 +114,48 @@ export default function Home({ syncInfo, registerRerunSearch }) {
       setOrigin(station);
       setSearchOrigin(station.raw);
       setAnimateResults(false);
+      setDestQuery(""); // nouvelle gare : la recherche de destination repart de zéro
     });
+  }, []);
+
+  // Derniers filtres mémorisés pour la prochaine visite (sans le jour choisi, ponctuel).
+  useEffect(() => {
+    saveFilters(filtersToRemember(filters));
+  }, [filters]);
+
+  // Recherche → URL. Nouvelle gare = nouvelle entrée d'historique (bouton « Précédent ») ;
+  // filtres, onglet et destination remplacent l'entrée courante.
+  const urlStationRef = useRef(initial.station?.raw ?? null);
+  useEffect(() => {
+    const query = serializeSearchState({
+      station: searchOrigin ? { raw: searchOrigin } : null,
+      filters,
+      destQuery: deferredDestQuery,
+      tab,
+    });
+    const { pathname, search, hash } = window.location;
+    if (query === search) return;
+    const url = `${pathname}${query}${hash}`;
+    if ((searchOrigin ?? null) !== urlStationRef.current) window.history.pushState(null, "", url);
+    else window.history.replaceState(null, "", url);
+    urlStationRef.current = searchOrigin ?? null;
+  }, [searchOrigin, filters, deferredDestQuery, tab]);
+
+  // « Précédent » / « Suivant » : l'URL redevient la source de vérité.
+  useEffect(() => {
+    const onPopState = () => {
+      const state = searchStateFromLocation();
+      urlStationRef.current = state.station?.raw ?? null;
+      startTransition(() => {
+        setOrigin(state.station);
+        setSearchOrigin(state.station?.raw ?? null);
+        setFilters(state.filters);
+        setDestQuery(state.destQuery);
+        setTab(state.tab);
+      });
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   const toastedOrigin = useRef(null);
@@ -100,7 +168,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
     if (!searchOrigin || isFetching || !data) return;
     if (toastedOrigin.current === searchOrigin) return;
     toastedOrigin.current = searchOrigin;
-    if (data.total_trips === 0 && data.served) {
+    if (data.total_trips === 0 && data.served && !data.omitted_connected_trips) {
       toast.info("Aucun train à 0€ pour le moment — réessayez plus tard.");
     }
   }, [searchOrigin, isFetching, data]);
@@ -138,20 +206,49 @@ export default function Home({ syncInfo, registerRerunSearch }) {
     return { groups, totalTrips: total };
   }, [preparedGroups, deferredFilters, hidden]);
 
-  const allFilteredTrips = useMemo(() => {
-    if (tab === "list") return [];
-    return filteredGroups.flatMap((g) => [
-      ...g.trips,
-      ...(g.connected_trips || []).map((c) => ({
-        date: c.date,
-        heure_depart: c.heure_depart,
-      })),
-    ]);
-  }, [filteredGroups, tab]);
+  // Recherche « Où voulez-vous aller ? » appliquée après les filtres.
+  const visibleGroups = useMemo(
+    () => filterGroupsByDestination(filteredGroups, deferredDestQuery),
+    [filteredGroups, deferredDestQuery]
+  );
+  const visibleTrips = useMemo(
+    () => (visibleGroups === filteredGroups ? totalTrips : visibleGroups.reduce((n, g) => n + g.trip_count, 0)),
+    [visibleGroups, filteredGroups, totalTrips]
+  );
+
+  const visibleNew = useMemo(
+    () => visibleGroups.reduce((n, g) => n + countNewItems(g.trips, g.connected_trips), 0),
+    [visibleGroups]
+  );
+
+  const chartTrips = useMemo(
+    () => (tab === "chart" ? departuresForCharts(visibleGroups) : []),
+    [visibleGroups, tab]
+  );
+
+  // Le calendrier montre tous les jours de l'horizon, même si un jour est sélectionné.
+  const calendarTrips = useMemo(() => {
+    if (tab !== "calendar") return [];
+    const { groups } = filterPreparedGroups(
+      preparedGroups,
+      { ...deferredFilters, selectedDate: null },
+      hidden
+    );
+    return departuresForCharts(filterGroupsByDestination(groups, deferredDestQuery));
+  }, [preparedGroups, deferredFilters, hidden, tab, deferredDestQuery]);
+
+  const onSelectDay = useCallback(
+    (date) => {
+      onFiltersChange({ ...filters, selectedDate: date });
+      setTab("list");
+    },
+    [filters, onFiltersChange]
+  );
+  const clearSelectedDay = () => onFiltersChange({ ...filters, selectedDate: null });
 
   useEffect(() => {
     setMobileVisibleDestinations(MOBILE_INITIAL_DESTINATIONS);
-  }, [data?.origin, filteredGroups.length]);
+  }, [data?.origin, visibleGroups.length]);
 
   const onHide = useCallback((key) => {
     hideDestination(key);
@@ -166,7 +263,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
       },
     });
   }, []);
-  const onResetHidden = () => { localStorage.removeItem("mt_hidden_destinations"); setHidden([]); };
+  const onResetHidden = () => { clearHidden(); setHidden([]); };
 
   const showEmpty = !data && !loading && !searchOrigin;
   const showResults = data && data.served && data.total_trips > 0;
@@ -176,14 +273,6 @@ export default function Home({ syncInfo, registerRerunSearch }) {
       <WelcomeModal />
 
       <section className="relative">
-        <div
-          className="absolute inset-0 -z-10 opacity-50"
-          style={{
-            backgroundImage: `linear-gradient(180deg, rgba(250,250,250,0) 0%, rgba(250,250,250,1) 100%), url(${HERO_BG})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold px-3 py-1 rounded-full mb-4">
@@ -194,8 +283,8 @@ export default function Home({ syncInfo, registerRerunSearch }) {
               depuis votre gare.
             </h1>
             <p className="mt-4 text-base sm:text-lg text-slate-600 max-w-2xl">
-              Saisissez votre gare de départ : MaxTracker consulte les disponibilités en temps quasi-réel et regroupe
-              pour vous toutes les destinations accessibles depuis n'importe quelle gare TGV.
+              Saisissez votre gare de départ : MaxTracker reprend les disponibilités TGV Max publiées chaque matin
+              par la SNCF et regroupe pour vous toutes les destinations accessibles depuis n'importe quelle gare TGV.
             </p>
           </div>
 
@@ -220,7 +309,11 @@ export default function Home({ syncInfo, registerRerunSearch }) {
         )}
 
         {!loading && data && data.served && data.total_trips === 0 && (
-          <NoTrains origin={data.origin} />
+          <NoTrains
+            origin={data.origin}
+            omittedConnections={data.omitted_connected_trips || 0}
+            onShowConnections={() => onFiltersChange({ ...filters, maxConnections: 1 })}
+          />
         )}
 
         {showResults && (
@@ -245,7 +338,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                 onChange={onFiltersChange}
                 hiddenCount={hidden.length}
                 onResetHidden={onResetHidden}
-                totalDestinations={filteredGroups.length}
+                totalDestinations={visibleGroups.length}
               />
             </div>
 
@@ -257,10 +350,20 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                       Au départ de <span className="text-[#10B981]">{data.origin}</span>
                     </h2>
                     <div className="text-sm text-slate-500 mt-0.5">
-                      <span className="font-mono">{totalTrips}</span> trajet{totalTrips > 1 ? "s" : ""} ·{" "}
-                      <span className="font-mono">{filteredGroups.length}</span> destination{filteredGroups.length > 1 ? "s" : ""}
+                      <span className="font-mono">{visibleTrips}</span> trajet{visibleTrips > 1 ? "s" : ""} ·{" "}
+                      <span className="font-mono">{visibleGroups.length}</span> destination{visibleGroups.length > 1 ? "s" : ""}
+                      {visibleNew > 0 && (
+                        <>
+                          {" · "}
+                          <span className="font-semibold text-violet-700 dark:text-violet-300" data-testid="new-count" title={NEW_TRIP_TITLE}>
+                            <span className="font-mono">{visibleNew}</span> nouveau{visibleNew > 1 ? "x" : ""}
+                          </span>
+                        </>
+                      )}
                       {refreshing && (
-                        <span className="ml-2 text-[#10B981]">· Mise à jour…</span>
+                        <span className="ml-2 text-[#10B981]">
+                          · {loadingConnections ? "Chargement des correspondances…" : "Mise à jour…"}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -271,31 +374,92 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                   </TabsList>
                 </div>
 
+                <div className="mb-4 flex flex-wrap items-center gap-3">
+                  <div className="relative w-full sm:max-w-xs">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" aria-hidden="true" />
+                    <input
+                      type="text"
+                      inputMode="search"
+                      enterKeyHint="search"
+                      value={destQuery}
+                      onChange={(e) => setDestQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === "Escape" && setDestQuery("")}
+                      placeholder="Où voulez-vous aller ?"
+                      aria-label="Filtrer les destinations"
+                      autoComplete="off"
+                      className="w-full h-10 pl-9 pr-9 rounded-xl bg-white border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#0A2540] focus:ring-2 focus:ring-[#0A2540]/10 dark:text-slate-100 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/20"
+                      data-testid="destination-search"
+                    />
+                    {destQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setDestQuery("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                        aria-label="Effacer la recherche de destination"
+                        data-testid="destination-search-clear"
+                      >
+                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
+                {filters.selectedDate && (
+                  <div data-testid="day-filter-chip">
+                    <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold filter-chip-active">
+                      <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                      {formatTripDayLabel(filters.selectedDate)}
+                      <button
+                        type="button"
+                        onClick={clearSelectedDay}
+                        className="-mr-1 rounded-full p-0.5 hover:bg-white/20"
+                        aria-label="Afficher tous les jours"
+                        title="Afficher tous les jours"
+                        data-testid="day-filter-clear"
+                      >
+                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </span>
+                  </div>
+                )}
+                </div>
+
                 <TabsContent value="list">
-                  {filteredGroups.length === 0 ? (
+                  {visibleGroups.length === 0 ? (
                     <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center text-slate-500" data-testid="no-results-after-filter">
-                      Aucun résultat avec ces filtres.
+                      {filteredGroups.length > 0 && deferredDestQuery.trim() ? (
+                        <>
+                          Aucune destination ne correspond à « {deferredDestQuery.trim()} ».{" "}
+                          <button
+                            type="button"
+                            onClick={() => setDestQuery("")}
+                            className="font-semibold text-[#0A2540] underline dark:text-emerald-300"
+                          >
+                            Effacer la recherche
+                          </button>
+                        </>
+                      ) : (
+                        "Aucun résultat avec ces filtres."
+                      )}
                     </div>
                   ) : (
                     <>
                       <div className={cn("hidden lg:block space-y-4", animateResults && "stagger")}>
-                        {filteredGroups.map((g) => (
+                        {visibleGroups.map((g) => (
                           <DestinationGroup key={g.destination_city} group={g} onHide={onHide} />
                         ))}
                       </div>
 
                       <div className={cn("lg:hidden space-y-4", animateResults && "stagger")}>
-                        {filteredGroups.slice(0, mobileVisibleDestinations).map((g) => (
+                        {visibleGroups.slice(0, mobileVisibleDestinations).map((g) => (
                           <DestinationGroup key={g.destination_city} group={g} onHide={onHide} />
                         ))}
-                        {filteredGroups.length > mobileVisibleDestinations && (
+                        {visibleGroups.length > mobileVisibleDestinations && (
                           <button
                             type="button"
                             onClick={() => setMobileVisibleDestinations((prev) => prev + MOBILE_DESTINATIONS_STEP)}
                             className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#0A2540] hover:bg-slate-50 text-sm font-semibold text-slate-700 transition-colors"
                             data-testid="mobile-load-more-destinations"
                           >
-                            Afficher {MOBILE_DESTINATIONS_STEP} destinations de plus ({filteredGroups.length - mobileVisibleDestinations} restantes)
+                            Afficher {MOBILE_DESTINATIONS_STEP} destinations de plus ({visibleGroups.length - mobileVisibleDestinations} restantes)
                           </button>
                         )}
                       </div>
@@ -304,11 +468,22 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                 </TabsContent>
 
                 <TabsContent value="calendar">
-                  {tab === "calendar" && <CalendarView trips={allFilteredTrips} />}
+                  {tab === "calendar" && (
+                    <CalendarView
+                      trips={calendarTrips}
+                      horizonDays={deferredFilters.dateHorizonDays ?? DEFAULT_DATE_HORIZON_DAYS}
+                      selectedDate={filters.selectedDate}
+                      onSelectDay={onSelectDay}
+                    />
+                  )}
                 </TabsContent>
 
                 <TabsContent value="chart">
-                  {tab === "chart" && <PeakHoursChart trips={allFilteredTrips} />}
+                  {tab === "chart" && (
+                    <Suspense fallback={<Skeleton className="h-80 rounded-2xl" />}>
+                      <PeakHoursChart trips={chartTrips} />
+                    </Suspense>
+                  )}
                 </TabsContent>
               </Tabs>
             </div>
@@ -321,7 +496,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
             onFiltersChange={onFiltersChange}
             hiddenCount={hidden.length}
             onResetHidden={onResetHidden}
-            totalDestinations={filteredGroups.length}
+            totalDestinations={visibleGroups.length}
           />
         )}
 
@@ -364,7 +539,7 @@ function EmptyHero() {
         </ul>
       </div>
       <div className="rounded-xl overflow-hidden border border-slate-100 bg-slate-50 aspect-[4/3]">
-        <img src={EMPTY_BG} alt="" className="w-full h-full object-cover" />
+        <img src={emptyStateImage} alt="" width={1024} height={1024} decoding="async" className="w-full h-full object-cover" />
       </div>
     </div>
   );
@@ -385,7 +560,29 @@ function NotServed({ origin }) {
   );
 }
 
-function NoTrains({ origin }) {
+function NoTrains({ origin, omittedConnections = 0, onShowConnections }) {
+  if (omittedConnections > 0) {
+    return (
+      <div className="mt-8 bg-white border border-slate-200 rounded-2xl p-10 text-center" data-testid="no-direct-trains-msg">
+        <div className="inline-flex h-16 w-16 rounded-2xl bg-slate-100 items-center justify-center mb-4">
+          <Inbox className="h-8 w-8 text-slate-400" />
+        </div>
+        <h3 className="text-2xl font-bold text-[#0A2540] mb-2">Aucun trajet direct à 0€</h3>
+        <p className="text-slate-600 max-w-md mx-auto">
+          Pas de train direct au départ de <strong>« {origin} »</strong> pour le moment, mais{" "}
+          <strong>{omittedConnections.toLocaleString("fr-FR")}</strong> parcours avec correspondance sont disponibles.
+        </p>
+        <button
+          type="button"
+          onClick={onShowConnections}
+          className="mt-5 h-11 px-6 rounded-xl bg-[#0A2540] hover:bg-[#173A5E] text-white font-semibold transition-colors"
+          data-testid="show-connections-btn"
+        >
+          Voir les trajets avec 1 correspondance
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="mt-8 bg-white border border-slate-200 rounded-2xl p-10 text-center" data-testid="no-trains-msg">
       <div className="inline-flex h-16 w-16 rounded-2xl bg-slate-100 items-center justify-center mb-4">
