@@ -45,12 +45,12 @@ import {
 } from "@/lib/urlState";
 import { filterGroupsByDestination } from "@/lib/destinationSearch";
 import { cn } from "@/lib/utils";
+// Illustration de l'accueil, hébergée avec l'app (WebP, 16 Ko au lieu d'un PNG de 690 Ko).
+import emptyStateImage from "@/assets/empty-state.webp";
 
 // Recharts (~la moitié du JavaScript de l'app) n'est chargé qu'à l'ouverture de l'onglet.
 const PeakHoursChart = lazy(() => import("@/components/PeakHoursChart"));
 
-const HERO_BG = "https://static.prod-images.emergentagent.com/jobs/f74c49b6-18a0-4cb7-95f4-30d605669f9b/images/cfaaa1f6fd3ab022112caad3ff0c854d3d7487ef5ce8eb07cef5ff782c6cb730.png";
-const EMPTY_BG = "https://static.prod-images.emergentagent.com/jobs/f74c49b6-18a0-4cb7-95f4-30d605669f9b/images/a8fc6da684e5f05873d772644a95f43d0c632d9f05c9468e3746d24581b9fbec.png";
 
 /**
  * État de recherche d'après l'URL. Un lien partagé (avec `gare`) impose ses filtres ;
@@ -266,14 +266,6 @@ export default function Home({ syncInfo, registerRerunSearch }) {
       <WelcomeModal />
 
       <section className="relative">
-        <div
-          className="absolute inset-0 -z-10 opacity-50"
-          style={{
-            backgroundImage: `linear-gradient(180deg, rgba(250,250,250,0) 0%, rgba(250,250,250,1) 100%), url(${HERO_BG})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold px-3 py-1 rounded-full mb-4">
@@ -532,7 +524,7 @@ function EmptyHero() {
         </ul>
       </div>
       <div className="rounded-xl overflow-hidden border border-slate-100 bg-slate-50 aspect-[4/3]">
-        <img src={EMPTY_BG} alt="" className="w-full h-full object-cover" />
+        <img src={emptyStateImage} alt="" width={1024} height={1024} decoding="async" className="w-full h-full object-cover" />
       </div>
     </div>
   );
