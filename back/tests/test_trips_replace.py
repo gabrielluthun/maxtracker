@@ -1,5 +1,6 @@
 """Remplacement atomique de la collection trips (staging + renameCollection)."""
 import asyncio
+import os
 import uuid
 
 import pytest
@@ -17,6 +18,8 @@ async def _mongo_or_skip():
         await client.admin.command("ping")
     except PyMongoError:
         client.close()
+        if os.environ.get("REQUIRE_MONGO"):
+            raise  # en CI, une base absente est une erreur, pas un test ignoré
         pytest.skip("MongoDB local indisponible")
     return client
 
