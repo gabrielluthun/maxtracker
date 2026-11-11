@@ -100,6 +100,8 @@ function CollapsibleFilterSection({
             )}
             data-testid={sectionTestId}
             aria-hidden={!open}
+            // Section repliée : ses boutons ne doivent pas recevoir le focus au clavier.
+            inert={!open}
           >
             {children}
           </div>
