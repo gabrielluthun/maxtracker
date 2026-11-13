@@ -6,10 +6,57 @@ import {
   enrichSearchGroups,
   filterPreparedGroups,
   calendarDays,
+  formatCountdown,
   isImminentDeparture,
   minutesUntilDeparture,
   mondayFirstWeekdayIndex,
+  nextDepartureLabel,
 } from "./tripTime";
+
+describe("nextDepartureLabel", () => {
+  const today = "2026-11-13"; // un vendredi
+
+  it("picks the earliest departure and says « auj. » for today", () => {
+    const trips = [
+      { date: "2026-11-14", heure_depart: "07:12:00" },
+      { date: "2026-11-13", heure_depart: "20:42:00" },
+    ];
+    expect(nextDepartureLabel(trips, [], today)).toBe("auj. 20:42");
+  });
+
+  it("says « demain » for the next day", () => {
+    expect(nextDepartureLabel([{ date: "2026-11-14", heure_depart: "07:12" }], [], today)).toBe("demain 07:12");
+  });
+
+  it("uses the short weekday and day number further out", () => {
+    expect(nextDepartureLabel([{ date: "2026-11-16", heure_depart: "10:59" }], [], today)).toBe("lun. 16 10:59");
+  });
+
+  it("uses connections when there is no direct trip", () => {
+    expect(nextDepartureLabel([], [{ date: "2026-11-15", heure_depart: "13:28" }], today)).toBe("dim. 15 13:28");
+  });
+
+  it("compares direct trips and connections together", () => {
+    const direct = [{ date: "2026-11-15", heure_depart: "18:00" }];
+    const connected = [{ date: "2026-11-15", heure_depart: "09:00" }];
+    expect(nextDepartureLabel(direct, connected, today)).toBe("dim. 15 09:00");
+  });
+
+  it("is null when there is nothing", () => {
+    expect(nextDepartureLabel([], [], today)).toBe(null);
+  });
+});
+
+describe("formatCountdown", () => {
+  it("shows minutes under an hour", () => {
+    expect(formatCountdown(45)).toBe("Dans 45 min");
+  });
+
+  it("shows hours and padded minutes from one hour", () => {
+    expect(formatCountdown(60)).toBe("Dans 1 h 00");
+    expect(formatCountdown(62)).toBe("Dans 1 h 02");
+  });
+});
 
 describe("calendarDays", () => {
   it("starts on the given Paris date, not the previous UTC day", () => {

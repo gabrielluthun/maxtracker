@@ -1,308 +1,182 @@
 # MaxTracker
 
-Site web gratuit pour repérer les trains **TGV Max à 0 €** depuis votre gare de départ, en direct ou avec correspondance (TGV INOUI, Intercités, Intercités de nuit), sans parcourir destination par destination sur SNCF Connect.
+Trouvez en un coup d'œil tous les trains **TGV Max à 0 €** au départ de votre gare, directs ou avec une correspondance, puis réservez sur SNCF Connect.
 
-**Pour qui ?** Titulaires d'un abonnement **MAX Jeune ou MAX Senior** (offres TGV Max).
-
-**Ce que c'est :** un outil de repérage **indépendant et non officiel** qui agrège les [données ouvertes SNCF](https://data.sncf.com/explore/dataset/tgvmax/), compose des parcours multi-segments lorsque c'est possible, puis vous **redirige** vers [SNCF Connect](https://www.sncf-connect.com) pour réserver.
-
-**Ce que ce n'est pas :** un site SNCF, un service de vente de billets ni une application de réservation. MaxTracker ne réserve pas à votre place et ne collecte aucun identifiant SNCF Connect.
+- **Pour qui :** titulaires d'un abonnement **MAX Jeune** ou **MAX Senior**.
+- **Ce que c'est :** un outil de repérage **gratuit, indépendant et non officiel**, construit sur les [données ouvertes SNCF](https://data.sncf.com/explore/dataset/tgvmax/).
+- **Ce que ce n'est pas :** un site de vente. MaxTracker ne réserve rien, ne demande aucun identifiant SNCF Connect et n'encaisse rien.
 
 ---
 
-## Sommaire
+## Comment ça marche
 
-- [À quoi ça sert ?](#à-quoi-ça-sert-)
-- [Fonctionnalités](#fonctionnalités)
-- [Comment l'utiliser](#comment-lutiliser)
-- [Ce que vous pouvez faire](#ce-que-vous-pouvez-faire)
-- [Bon à savoir](#bon-à-savoir)
-- [Avertissement](#avertissement)
-- [Pour les développeurs](#pour-les-développeurs)
+1. Tapez votre **gare / ville de départ**, au moins 3 lettres. Les noms courants marchent : « Montparnasse », « Part-Dieu », « Saint-Pierre-des-Corps », « Lyon », « Marseille », etc.
+2. MaxTracker liste **toutes les destinations** atteignables à 0 € dans les 30 prochains jours, regroupées par ville.
+3. Affinez avec les filtres, puis ouvrez **SNCF Connect** depuis le train choisi. Une correspondance donne un lien par train.
 
----
-
-## À quoi ça sert ?
-
-Si vous avez un abonnement TGV Max, MaxTracker répond à une question simple : *« Quels trajets à 0 € puis-je prendre depuis ma gare dans les 30 prochains jours ? »*
-
-L'application interroge une base alimentée par le jeu ouvert [« Disponibilités TGV Max »](https://data.sncf.com/explore/dataset/tgvmax/) publié par SNCF Voyageurs. Elle affiche les **trajets directs** et, lorsque les créneaux s'enchaînent correctement, des **parcours avec correspondance** (jusqu'à 1).
-
-Le moteur sait composer des parcours jusqu'à **2 correspondances** (3 trains), mais cette profondeur n'est pas proposée en production. 
-Voir le [rapport de limitation](doc/rapport-limite-correspondances.md) pour le détail des mesures.
-
-La SNCF publie une nouvelle vague de données **chaque jour en début de matinée** (aux alentours de 6 h 30). MaxTracker importe ce flux environ **toutes les 15 minutes** : ce n'est pas du temps réel, mais cela permet de rafraîchir régulièrement les trajets éligibles et les heures de départ.
-
-Pour le détail des filtres, des parcours composés, des horodatages affichés et des écarts possibles avec SNCF Connect, voir la page **À propos** dans l'application (`#/about`) ou le fichier [front/src/pages/About.jsx](front/src/pages/About.jsx).
-
----
+Les données viennent du jeu SNCF [« Disponibilités TGV Max »](https://data.sncf.com/explore/dataset/tgvmax/). La SNCF le publie au moins une fois par jour, vers 6 h 30. MaxTracker vérifie toutes les 15 minutes s'il a changé. **Ce n'est pas du temps réel :** vérifiez toujours sur SNCF Connect avant de partir.
 
 ## Fonctionnalités
 
-- Recherche par gare de départ, résultats groupés par ville d'arrivée
-- **Trajets directs** et **parcours avec correspondance** (filtre : direct ou 1 correspondance)
-- **Filtres simples** : type de train, correspondances max
-- **Filtres avancés** : horizon de dates (7 / 14 / 30 j, défaut 30 j), créneaux horaires, durée totale max (≤ 3 h / 5 h / 8 h), départ aujourd'hui, et départ week-end uniquement
-- Vues **Liste**, **Calendrier** (sur l'horizon choisi, un clic sur un jour filtre la liste) et **Pics horaires**
-- **Recherche de destination** dans les résultats (« Où voulez-vous aller ? »)
-- Badge **« Départ possible aujourd'hui »**, badge **« Imminent »** (< 4 h), mention **« +1 j »** sur les arrivées le lendemain
-- Gares **favoris**, **masquage** de destinations, **sync manuelle**
-- **Lien partageable** : gare, filtres et vue sont dans l'URL (bouton « Précédent » compris) ; derniers filtres mémorisés d'une visite à l'autre
-- **Mode clair / sombre** (préférence mémorisée, transition en fondu au basculement)
+| Besoin | Dans l'application |
+|--------|--------------------|
+| Voir tous les départs à 0 € | Recherche par gare ou par ville (« Paris (toutes gares) ») |
+| Trouver une destination précise | Champ **« Où voulez-vous aller ? »** |
+| Changer de train en route | Filtre **1 correspondance** (Direct par défaut) |
+| Voir les places qui viennent d'apparaître | Badge **« Nouveau »** et filtre **Nouveautés uniquement** (dernières 24 h de publications SNCF) |
+| Partir aujourd'hui, le week-end, le matin… | Filtres *Départ aujourd'hui*, *Week-end*, *Créneaux horaires* |
+| Limiter la durée ou la période | Filtres *Durée totale max* (3 / 5 / 8 h) et *Horizon* (7 / 14 / 30 j) |
+| Ne garder qu'un type de train | TGV INOUI / OUIGO, Intercités, Intercités de nuit |
+| Planifier sur le mois | Vue **Calendrier** : un clic sur un jour affiche ses trajets |
+| Repérer les meilleures heures | Vue **Pics horaires** |
+| Partager ou retrouver une recherche | L'adresse de la page contient la gare, les filtres et la vue |
 
----
-
-## Comment l'utiliser
-
-Ouvrez l'application web, puis :
-
-1. **Saisissez votre gare de départ** (au moins 3 lettres pour l'autocomplétion)
-2. Lancez la recherche
-3. Parcourez les résultats **par ville de destination** (trains directs et parcours composés, triés par date)
-4. Affinez avec les **filtres** dans le panneau *Filtres simples* / *Filtres avancés* (ou la feuille mobile)
-5. Cherchez une ville précise avec **« Où voulez-vous aller ? »**, puis changez de vue : **Liste**, **Calendrier** ou **Pics horaires**
-6. Ouvrez **SNCF Connect** depuis chaque train pour réserver (un lien par segment sur les parcours avec correspondance)
-
-**Astuces**
-
-- **Gares favorites** enregistrées localement dans votre navigateur
-- **Partagez une recherche** en copiant l'adresse de la page : elle contient la gare, les filtres et la vue
-- **Calendrier** : cliquez sur un jour pour n'afficher que ses trajets
-- **Masquer** une destination que vous ne voulez plus voir (réversible via « Réafficher tout »)
-- **Correspondances max** : *Direct* par défaut ; passez à *1 correspondance* pour voir les parcours composés
-- **Horizon de dates** : 30 j par défaut ; réduisez à 7 ou 14 j pour alléger la liste
-- **Durée totale max** : utile pour les allers-retours à la journée (porte à porte, attentes incluses)
-- Badge **« Départ possible aujourd'hui »** : au moins un départ encore possible aujourd'hui vers cette ville
-- Badge **« Imminent »** : départ dans moins de 4 heures
-- Le header affiche deux horodatages : dernière publication **SNCF** et dernière importation **MaxTracker**
-- Bouton de **sync manuelle** pour forcer un rafraîchissement des données (l'import SNCF prend ~5 s ; l'icône peut encore tourner ~20 s pendant la reconstruction du cache)
-- Icône **soleil / lune** dans le header : bascule le thème clair / sombre avec un fondu progressif
-
----
-
-## Ce que vous pouvez faire
-
-| Besoin | Dans l'app |
-|--------|------------|
-| Voir tous les départs à 0 € depuis une gare | Recherche par gare de départ |
-| Comparer les destinations | Liste groupée par ville |
-| Ne garder que les trajets directs | Filtre *Correspondances max* → Direct |
-| Autoriser 1 changement de train | Filtre *Correspondances max* → 1 |
-| Limiter aux 7 / 14 / 30 prochains jours | Filtre *Horizon de dates* |
-| Aller-retour à la journée | Filtre *Durée totale max* |
-| Ne garder que les départs du jour | Filtre *Départ aujourd'hui* |
-| Cibler le week-end ou un créneau | Filtres week-end et horaires |
-| Ne garder que TGV INOUI ou Intercités | Filtres par type de train |
-| Trouver une ville précise | Champ « Où voulez-vous aller ? » |
-| Planifier sur le mois | Vue calendrier (clic sur un jour → trajets de ce jour) |
-| Partager une recherche | Copier l'adresse de la page |
-| Repérer les meilleures heures | Graphique des pics horaires |
-| Réserver | Lien(s) SNCF Connect (par segment si correspondance) |
-
-Si **aucun train éligible** n'apparaît pour votre gare, l'app vous l'indique clairement : les places se libèrent souvent par vagues, réessayez plus tard.
-
-Si la gare n'est **pas desservie** par l'offre TGV Max, un message d'erreur vous le signale.
-
----
+Aussi :
+- badges **« Départ possible aujourd'hui »** et **« Imminent »** (moins de 4 h) ;
+- mention **« +1 j »** quand l'arrivée a lieu le lendemain ;
+- **gares favorites** et **destinations masquées**, enregistrées dans votre navigateur ;
+- **mode sombre** ;
+- **navigation au clavier**.
 
 ## Bon à savoir
 
-- **Vérifiez toujours sur SNCF Connect** avant de vous déplacer. Un train éligible affiché ici peut avoir été réservé entre deux mises à jour.
-- **Fenêtre de 30 jours** : seuls les départs dans les 30 prochains jours sont indexés. Le filtre *Horizon* restreint cette plage côté interface.
-- **Parcours composés** : chaque trajet doit être réservable à 0 € ; temps de correspondance minimum 25 min (même gare) ou 50 min (même métropole). Ce ne sont pas des itinéraires garantis par la SNCF, mais des enchaînements calculés depuis l'open data. L'interface se limite à **1 correspondance** (2 trains) : voir [rapport de limitation](doc/rapport-limite-correspondances.md).
-- **Pas de réservation ici** : MaxTracker affiche les créneaux éligibles ; la vente et le paiement restent sur les canaux officiels SNCF.
-- **Écarts possibles avec SNCF Connect** : l'app officielle s'appuie sur des systèmes privés en temps réel ; MaxTracker n'utilise que le flux public open data.
-- **Service non officiel** : MaxTracker n'est pas affilié à la SNCF. Les marques citées (« SNCF », « TGV Max », « SNCF Connect », etc.) appartiennent à leurs propriétaires respectifs.
+- **Les correspondances sont calculées, pas garanties par la SNCF.** Chaque train doit être à 0 €, avec un temps de changement minimum :
+  - 25 min dans une même gare ;
+  - 60 min entre deux gares parisiennes : 30 min pour Nord ↔ Est et Gare de Lyon ↔ Bercy, 40 min pour Gare de Lyon ↔ Austerlitz ;
+  - 50 min ailleurs, et 75 min avec Lyon Saint-Exupéry.
+- **Des écarts avec SNCF Connect sont normaux.** SNCF Connect voit les places en temps réel, alors que MaxTracker ne voit que la dernière publication open data.
+- **Des TGV couplés** (deux numéros, mêmes horaires) n'apparaissent qu'une fois.
+- **Service non affilié à la SNCF.** « SNCF », « TGV », « TGV Max », « MAX JEUNE », « MAX ACTIF » et « SNCF Connect » sont des marques de leurs propriétaires. Les données sont utilisées sous la licence du portail [data.sncf.com](https://data.sncf.com/).
+
+Des questions ou un bug ? Ouvrez une [issue GitHub](../../issues). Il n'y a pas de support commercial.
 
 ---
-
-## Avertissement
-
-MaxTracker **n'est pas affilié à la SNCF**. « SNCF », « TGV », « TGV Max », « MAX JEUNE », « MAX ACTIF » et « SNCF Connect » sont des marques déposées de leurs propriétaires respectifs.
-
-Les données affichées proviennent du portail [data.sncf.com](https://data.sncf.com/explore/dataset/tgvmax/), sous la licence indiquée par le portail open data. L'application ne collecte pas d'identifiants SNCF Connect et n'effectue aucune transaction.
-
----
-
-Les retours se font via les issues GitHub.
-Il n'y a pas de support commercial ni de lien avec la SNCF pour les disponibilités ou les réservations.
 
 <details>
 <summary><h2>Pour les développeurs</h2></summary>
 
-Ce dépôt contient le code source de MaxTracker (API FastAPI + interface React). Les sections ci-dessus décrivent le service tel qu'un utilisateur le voit ; ce qui suit concerne l'installation et le développement local.
+API **FastAPI** + **MongoDB** (backend) et **React / Vite** (frontend).
 
 ### Démarrage local
 
-**Prérequis :** Python 3.11, Node.js 20.19+ (requis par Vite), MongoDB.
-
-**MongoDB local fortement recommandé** pour des temps de réponse corrects (cache de recherche ~200 Mo) : une source distante ajoute une latence réseau importante sur les interactions utilisateur.
+**Prérequis :** Python 3.11+, Node.js 20.19+, MongoDB local. Une base distante rend chaque recherche nettement plus lente.
 
 ```bash
-# MongoDB (macOS, Homebrew)
-brew tap mongodb/brew
-brew install mongodb-community@8.0
+# MongoDB (macOS)
+brew tap mongodb/brew && brew install mongodb-community@8.0
 brew services start mongodb/brew/mongodb-community@8.0
 
 # Backend
 cd back
 cp .env.example .env
-# Par défaut : MONGO_URL=mongodb://127.0.0.1:27017
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements-dev.txt   # dépendances de l'app + outils de test
+pip install -r requirements-dev.txt
 uvicorn server:app --reload --port 8000
 
 # Frontend (autre terminal)
 cd front
-npm install
+npm ci
 npm start
 ```
 
-- API : [http://localhost:8000/api/](http://localhost:8000/api/)
-- App : [http://localhost:3000](http://localhost:3000)
-- OpenAPI : [http://localhost:8000/docs](http://localhost:8000/docs)
+- App : <http://localhost:3000>
+- API : <http://localhost:8000/api/>
+- Documentation OpenAPI : <http://localhost:8000/docs>
 
-Au premier lancement avec une base vide, une **sync SNCF automatique** s'exécute (~5 s d'import). Le bouton de sync manuelle peut rester actif **~20 s de plus** le temps du préchauffage du cache de recherche.
+Avec une base vide, une synchronisation se lance au démarrage. Elle importe les trajets en ~5 s, puis précalcule les recherches de toutes les gares (~100 s, en arrière-plan).
 
-### Structure du dépôt
+**Tests :**
+- backend : `cd back && pytest` ;
+- frontend : `cd front && npm test && npm run lint`.
 
-```
-tgvmax-platform/
-├── back/                          # API FastAPI
-│   ├── server.py                  # Point d'entrée Uvicorn
-│   ├── requirements.txt           # dépendances de production
-│   ├── requirements-dev.txt       # + pytest (développement, CI)
-│   ├── runtime.txt                # Version Python (Render)
-│   ├── .env.example
-│   ├── app/
-│   │   ├── main.py                # Lifespan, scheduler, wiring
-│   │   ├── config.py
-│   │   ├── dependencies.py
-│   │   ├── api/
-│   │   │   ├── router.py
-│   │   │   └── routes/            # health, search, stations, sync
-│   │   ├── core/
-│   │   │   ├── logging.py
-│   │   │   ├── rate_limit.py      # limite cold compute 
-│   │   │   └── memory_cache.py    # cache L1 process-local
-│   │   ├── db/
-│   │   │   ├── mongodb.py
-│   │   │   └── repositories/      # trips, sync_state, search_cache
-│   │   ├── domain/
-│   │   │   ├── connections.py     # règles métier correspondances
-│   │   │   ├── stations.py        # métropoles / hubs
-│   │   │   ├── train_classifier.py
-│   │   │   └── trips.py
-│   │   ├── schemas/               # modèles Pydantic (API)
-│   │   └── services/
-│   │       ├── search.py          # cache L1/L2, recherche, warm cache
-│   │       ├── connections.py     # mapping domain → DTO
-│   │       ├── sync.py            # pipeline SNCF → Mongo
-│   │       └── sncf/              # client Open Data + liens Connect
-│   └── tests/
-├── front/                         # SPA React (Vite)
-│   ├── index.html                 # point d'entrée Vite
-│   ├── vite.config.mjs            # alias @/, port 3000, sortie build/, Vitest
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── AppRouter.jsx      # navigation Recherche / À propos
-│   │   │   ├── ConnectedTripCard.jsx, DestinationGroup.jsx…
-│   │   │   └── ui/                # composants Radix / shadcn
-│   │   ├── hooks/
-│   │   │   └── useSearchTrips.js  # React Query (search + prefetch)
-│   │   ├── pages/
-│   │   │   ├── Home.jsx
-│   │   │   └── About.jsx
-│   │   └── lib/                   # api, sncfConnect, storage, tripKeys, tripTime, utils
-│   └── package.json
-├── doc/
-│   ├── regles-de-gestion.md
-│   ├── contraintes.md
-│   └── rapport-limite-correspondances.md
-└── .github/
-    ├── workflows/ci.yml           # CI : tests backend (+ MongoDB), lint/tests/build frontend
-    └── ISSUE_TEMPLATE/, PULL_REQUEST_TEMPLATE.md
-```
+La CI GitHub Actions (`.github/workflows/ci.yml`) lance les deux à chaque push et à chaque pull request.
 
-### Variables d'environnement
-
-**Backend** (`back/.env`) :
-
-| Variable | Obligatoire | Description |
-|----------|-------------|-------------|
-| `MONGO_URL` | Oui | URI MongoDB |
-| `DB_NAME` | Oui | Nom de la base (ex. `tgvmax`) |
-| `CORS_ORIGINS` | Oui | Origines autorisées (séparées par des virgules) |
-
-Optionnel :
-
-| Variable | Défaut | Description |
-|----------|--------|-------------|
-| `SYNC_INTERVAL_MIN` | `15` | Intervalle de sync automatique |
-| `CACHE_WARM_CONCURRENCY` | `8` | Parallélisme du warm cache post-sync |
-| `SEARCH_RESULT_LIMIT` | `20000` | Garde-fou : trajets max. au départ d'une gare (alerte dans les logs s'il est atteint) |
-| `TRUSTED_PROXY_HOPS` | `0` | Proxys de confiance devant l'API (Vercel, nginx) pour la limite par IP — voir [doc/deploiement.md](doc/deploiement.md) |
-
-**Frontend** (build) : `REACT_APP_BACKEND_URL` — URL du backend **sans** `/api` (préfixe `REACT_APP_` conservé via `envPrefix` dans `vite.config.mjs`).
-
-### API
-
-Préfixe : `/api`
-
-| Méthode | Route | Description |
-|---------|-------|-------------|
-| `GET` | `/` | Santé (réponse fixe) |
-| `GET` | `/health` | Supervision : MongoDB + fraîcheur des syncs (`ok` / `degraded` → 200, `down` → 503) |
-| `GET` | `/search?origin={gare}&connections=0\|1&compact=0\|1` | Trajets par destination (cache L1/L2). Par défaut : réponse complète. `connections=0` : directs seuls (+ `omitted_connected_trips`) ; `compact=1` : sans les champs recalculés côté client (lien SNCF Connect, ids…) |
-| `GET` | `/stations/search?q={texte}` | Autocomplétion gares (≥ 3 caractères) : insensible aux accents, tirets et « Saint »/« St », mots n'importe où dans le nom, gares regroupées par la SNCF retrouvées par leur vrai nom (« Montparnasse » → Paris) |
-| `GET` | `/sync/info` | État de la synchronisation |
-| `POST` | `/sync/trigger` | Sync manuelle SNCF + warm cache (1 toutes les 3 min, sinon HTTP 429 + `Retry-After`) |
-
-Comportements notables :
-
-- **Cache** : L1 mémoire (LRU) + L2 collection Mongo `search_cache` ; refresh stale en arrière-plan si les données SNCF ont changé. Les réponses mises en forme et compressées sont aussi gardées en mémoire, par origine, variante et minute (~3 ms par hit).
-- **Volumes** (Paris) : complet 640 Ko gzip ; directs seuls + compact 43 Ko — c'est ce que charge le front par défaut, les correspondances n'étant demandées que si le filtre les affiche.
-- **Rate limit** : 10 recherches « cold compute » / minute / IP (HTTP 429) ; les hits cache ne sont pas limités.
-- **Compression** : réponses > 1 Ko compressées en gzip (niveau 6) — `/search` Paris passe de ~17,7 Mo à ~640 Ko.
-- **Sync** : une seule à la fois (verrou) ; la collection `trips` est remplacée de façon atomique (`trips_staging` puis `renameCollection`). Le référentiel des gares (libellés) est chargé en arrière-plan et rechargé au plus une fois par jour.
-- **Première recherche** sur une origine non cachée : calcul serveur (~15–25 s) ; les recherches suivantes sont quasi instantanées avec Mongo.
-
-Tests backend : `cd back && pytest tests/` · Tests et lint frontend : `cd front && npm test && npm run lint`
-
-### Documentation technique
-
-| Document | Contenu |
-|----------|---------|
-| [doc/regles-de-gestion.md](doc/regles-de-gestion.md) | Règles de gestion |
-| [doc/contraintes.md](doc/contraintes.md) | Contraintes données, métier, légales |
-| [doc/rapport-limite-correspondances.md](doc/rapport-limite-correspondances.md) | Limitation à 1 correspondance (taille cache MongoDB) |
-| [doc/deploiement.md](doc/deploiement.md) | Mise à jour du VPS, variables, proxys, HTTPS, supervision, CI |
-| [front/src/pages/About.jsx](front/src/pages/About.jsx) | Page À propos (parcours, filtres, sync) |
-
-### Stack
-
-| Couche | Technologie |
-|--------|-------------|
-| Frontend | React 19, Vite, TanStack Query, Tailwind CSS, Radix UI, Recharts (chargé à la demande), Vitest |
-| Backend | FastAPI, Uvicorn, PyMongo (API async), APScheduler |
-| Base | MongoDB (`trips`, `sync_state`, `search_cache`) |
-| Source | [Open Data SNCF, jeu tgvmax](https://data.sncf.com/explore/dataset/tgvmax/) |
-
-**Déploiement :** backend et MongoDB sur un VPS ; frontend sur Vercel — détails dans [doc/deploiement.md](doc/deploiement.md).
+### Fonctionnement
 
 ```mermaid
 flowchart LR
-  FE[Interface web] --> API[API MaxTracker]
-  API --> L1[Cache L1 mémoire]
-  API --> L2[(search_cache Mongo)]
-  API --> TRIPS[(trips Mongo)]
-  API --> SNCF[Open Data SNCF]
-  API --> COMPOSE[domain/connections]
+  SNCF[Open data SNCF] -->|toutes les 15 min| SYNC[Sync]
+  SYNC --> TRIPS[(trips)]
+  SYNC -->|précalcul| L2[(search_cache)]
+  FE[Site React] -->|/api/search| API[API FastAPI]
+  API --> L1[Cache mémoire] --> L2
+  API -.calcul à froid.-> TRIPS
   FE --> SC[SNCF Connect]
 ```
 
-### Licence
+- **Sync** (`services/sync.py`) :
+  - garde les trajets marqués éligibles par la SNCF, sur 30 jours, sans les trajets intra-ville ;
+  - date l'apparition de chaque trajet pour le badge « Nouveau » ;
+  - remplace la collection `trips` d'un coup (`trips_staging` puis `renameCollection`).
 
-À définir selon la politique du dépôt. L'usage du jeu de données SNCF est soumis aux [conditions du portail open data](https://data.sncf.com/).
+  Une seule sync tourne à la fois. Elle est sautée si la SNCF n'a rien publié et que `PIPELINE_VERSION` n'a pas changé.
+- **Recherche** (`services/search.py`) :
+  - trajets directs, puis correspondances via les métropoles (`domain/connections.py`) ;
+  - résultats mis en cache dans Mongo (`search_cache`) et en mémoire, recalculés après chaque sync ;
+  - un calcul à froid prend 1 à 2 s et est limité à 10 par minute et par IP.
+- **Réponses** : gzip. `connections=0` et `compact=1` allègent la réponse : Paris passe de 640 Ko à 43 Ko. Le front ne charge les correspondances que si le filtre les demande.
+
+### API
+
+Préfixe `/api`.
+
+| Méthode | Route | Rôle |
+|---------|-------|------|
+| `GET` | `/health` | Supervision : MongoDB et fraîcheur des syncs (`ok` / `degraded` → 200, `down` → 503) |
+| `GET` | `/search?origin=…&connections=0\|1&compact=0\|1` | Trajets par destination. Par défaut : réponse complète |
+| `GET` | `/stations/search?q=…` | Autocomplétion des gares (accents, tirets, « Saint »/« St », noms usuels) |
+| `GET` | `/sync/info` | État de la dernière synchronisation |
+| `POST` | `/sync/trigger` | Synchronisation manuelle : 1 toutes les 3 min, sinon 429 + `Retry-After` |
+
+### Configuration
+
+`back/.env` :
+
+| Variable | Défaut | Rôle |
+|----------|--------|------|
+| `MONGO_URL` | — (obligatoire) | URI MongoDB |
+| `DB_NAME` | — (obligatoire) | Nom de la base |
+| `CORS_ORIGINS` | `*` | Origines autorisées, séparées par des virgules |
+| `SYNC_INTERVAL_MIN` | `15` | Intervalle de vérification des données SNCF |
+| `CACHE_WARM_CONCURRENCY` | `8` | Gares précalculées en parallèle après une sync |
+| `SEARCH_RESULT_LIMIT` | `20000` | Garde-fou : trajets max. au départ d'une gare (alerte dans les logs) |
+| `TRUSTED_PROXY_HOPS` | `0` | Proxys devant l'API, pour la limite par IP (voir [deploiement.md](doc/deploiement.md)) |
+
+Frontend : `REACT_APP_BACKEND_URL`, l'URL du backend sans `/api`.
+
+### Organisation
+
+```
+back/
+  app/
+    api/routes/      health, search, stations, sync
+    core/            caches mémoire, limite par IP, IP derrière proxy
+    db/              connexion MongoDB et dépôts (trips, sync_state, search_cache)
+    domain/          règles métier : correspondances, gares, recherche de gares,
+                     trajets nouveaux, type de train, heure de Paris
+    services/        sync SNCF, recherche, mise en forme des réponses, client SNCF
+  tests/             pytest (les tests MongoDB tournent sur une base jetable)
+front/
+  src/
+    components/      cartes de trajet, filtres, calendrier, barre de recherche…
+    hooks/           React Query, focus des fenêtres, thème
+    lib/             API, URL partageable, filtres et horaires, liens SNCF Connect
+    pages/           Home, About
+doc/                 règles de gestion, contraintes, déploiement, diagrammes
+```
+
+### Documentation
+
+| Document | Contenu |
+|----------|---------|
+| [doc/deploiement.md](doc/deploiement.md) | Mise en production sur le VPS, variables, proxys, HTTPS, supervision |
+| [doc/regles-de-gestion.md](doc/regles-de-gestion.md) | Règles de gestion |
+| [doc/contraintes.md](doc/contraintes.md) | Contraintes données, métier, légales |
+| [doc/rapport-limite-correspondances.md](doc/rapport-limite-correspondances.md) | Pourquoi 1 correspondance au maximum |
+| [doc/diagrams/](doc/diagrams/) | Sync et recherche pendant une sync |
+
+**Déploiement :** backend et MongoDB sur un VPS, frontend sur Vercel. Voir [doc/deploiement.md](doc/deploiement.md).
+
+**Licence :** à définir. L'usage des données SNCF est soumis aux [conditions du portail open data](https://data.sncf.com/).
 
 </details>

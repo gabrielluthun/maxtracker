@@ -1,18 +1,28 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Search, Star, X, MapPin, Loader2 } from "lucide-react";
+import { Search, Star, X, MapPin, Loader2, ChevronRight } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { searchStations } from "@/lib/api";
-import { getFavorites, toggleFavorite } from "@/lib/storage";
-import { usePrefetchSearch } from "@/hooks/useSearchTrips";
+import { searchQueryKey, usePrefetchSearch } from "@/hooks/useSearchTrips";
+import { useIsDesktop } from "@/hooks/useIsDesktop";
+import { countNewItems } from "@/lib/tripTime";
 import { cn } from "@/lib/utils";
 
 const STATIONS_DEBOUNCE_MS = 120;
 
-export default function SearchBar({ origin, onOriginChange, onSearch, loading }) {
+/** Nouveautés d'une gare favorite, seulement si sa recherche est déjà en cache (aucune requête). */
+function cachedNewCount(queryClient, raw) {
+  const data = queryClient.getQueryData(searchQueryKey(raw));
+  if (!data?.groups) return 0;
+  return data.groups.reduce((n, g) => n + countNewItems(g.trips, g.connected_trips), 0);
+}
+
+export default function SearchBar({ origin, onOriginChange, onSearch, loading, favs, onToggleFavorite, autoFocus = false }) {
+  const isDesktop = useIsDesktop();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState(origin?.name || "");
   const [suggestions, setSuggestions] = useState([]);
   const [stationsLoading, setStationsLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [favs, setFavs] = useState(getFavorites());
   const [active, setActive] = useState(-1);
   const wrapRef = useRef(null);
   const cacheRef = useRef(new Map());
@@ -103,8 +113,7 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
 
   const fav = origin ? !!favs.find((f) => f.raw === origin.raw) : false;
   const onFav = () => {
-    if (!origin) return;
-    setFavs(toggleFavorite(origin));
+    if (origin) onToggleFavorite(origin);
   };
 
   const handlePrefetch = () => {
@@ -113,8 +122,11 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
 
   return (
     <div className="w-full" ref={wrapRef}>
-      <div className="bg-white rounded-2xl shadow-[0_24px_60px_-24px_rgba(10,37,64,0.25)] border border-slate-200 p-4 md:p-6">
-        <label htmlFor={inputId} className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+      <div className={cn(isDesktop && "bg-white rounded-2xl shadow-[0_24px_60px_-24px_rgba(10,37,64,0.25)] border border-slate-200 p-6")}>
+        <label
+          htmlFor={inputId}
+          className={isDesktop ? "block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5" : "sr-only"}
+        >
           Gare de départ
         </label>
         <div className="flex flex-col md:flex-row gap-3 md:items-center">
@@ -137,7 +149,13 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
                 onKeyDown={onKeyDown}
                 placeholder="Tapez au moins 3 lettres pour trouver une gare"
                 aria-busy={stationsLoading}
-                className="w-full h-14 pl-12 pr-12 rounded-xl bg-slate-50 border-2 border-slate-200 focus:border-[#0A2540] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#0A2540]/10 text-lg"
+                autoFocus={autoFocus}
+                className={cn(
+                  "w-full h-14 pl-12 pr-12 rounded-xl border-2 border-slate-200 focus:outline-none",
+                  isDesktop
+                    ? "bg-slate-50 focus:border-[#0A2540] focus:bg-white focus:ring-4 focus:ring-[#0A2540]/10 text-lg"
+                    : "bg-white text-[17px] font-semibold focus:border-[#10B981] focus:ring-4 focus:ring-[#10B981]/15"
+                )}
               />
               {stationsLoading ? (
                 <Loader2
@@ -164,7 +182,11 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
                 id={listboxId}
                 role="listbox"
                 aria-label="Gares correspondantes"
-                className="absolute z-30 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto"
+                className={cn(
+                  "mt-2 bg-white border border-slate-200 rounded-xl overflow-hidden max-h-80 overflow-y-auto",
+                  // Mobile : la liste pousse « Vos gares » vers le bas au lieu de la recouvrir.
+                  isDesktop ? "absolute z-30 left-0 right-0 shadow-2xl" : "relative p-1"
+                )}
                 data-testid="suggestions-list"
               >
                 {suggestions.map((s, i) => (
@@ -185,7 +207,7 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
                     )}
                     data-testid={`suggestion-${i}`}
                   >
-                    <MapPin className="h-4 w-4 text-slate-400" strokeWidth={2} aria-hidden="true" />
+                    {isDesktop && <MapPin className="h-4 w-4 text-slate-400" strokeWidth={2} aria-hidden="true" />}
                     <span className="flex-1 min-w-0">
                       <span className="block text-slate-800">{s.name}</span>
                       {s.hint && (
@@ -218,7 +240,8 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
             )}
           </div>
 
-          <div className="shrink-0 md:shrink">
+          {/* Mobile : choisir une suggestion (ou Entrée) lance déjà la recherche. */}
+          <div className={isDesktop ? "shrink-0 md:shrink" : "hidden"}>
             <button
               data-testid="search-submit-btn"
               onClick={() => origin && onSearch(origin)}
@@ -240,7 +263,40 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
           </div>
         </div>
 
-        {favs.length > 0 && (
+        {favs.length > 0 && !isDesktop && (
+          <div className="mt-6" data-testid="favorites-bar">
+            <h2 className="mb-2 text-xs font-bold uppercase tracking-[0.08em] text-slate-500" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+              Vos gares
+            </h2>
+            <ul className="space-y-2">
+              {favs.map((f) => {
+                const newCount = cachedNewCount(queryClient, f.raw);
+                return (
+                  <li key={f.raw}>
+                    <button
+                      type="button"
+                      data-testid={`fav-pick-${f.raw}`}
+                      onClick={() => { onOriginChange(f); setQuery(f.name); onSearch(f); }}
+                      className="w-full min-h-14 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 text-left hover:bg-slate-50"
+                    >
+                      <Star className="h-[18px] w-[18px] shrink-0 fill-amber-400 text-amber-400" aria-hidden="true" />
+                      <span className="flex-1 min-w-0 truncate font-semibold text-slate-900">{f.name}</span>
+                      {newCount > 0 ? (
+                        <span className="shrink-0 text-xs font-bold text-violet-700 dark:text-violet-300">
+                          {newCount} nouveau{newCount > 1 ? "x" : ""}
+                        </span>
+                      ) : (
+                        <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        {favs.length > 0 && isDesktop && (
           <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2 flex-wrap" data-testid="favorites-bar">
             <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Favoris</span>
             {favs.map((f) => (
@@ -256,7 +312,7 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
                 </button>
                 <button
                   data-testid={`fav-remove-${f.raw}`}
-                  onClick={() => setFavs(toggleFavorite(f))}
+                  onClick={() => onToggleFavorite(f)}
                   className="opacity-50 hover:opacity-100 ml-1 p-0.5 rounded-full hover:bg-amber-100"
                   title="Retirer"
                 >

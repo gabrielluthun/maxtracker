@@ -96,6 +96,12 @@ export function minutesUntilDeparture(date, heureDepart, clock = getParisClock()
   return departure - now;
 }
 
+/** Badge mobile « Dans 45 min » / « Dans 1 h 02 ». */
+export function formatCountdown(minutes) {
+  if (minutes < 60) return `Dans ${minutes} min`;
+  return `Dans ${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")}`;
+}
+
 export const IMMINENT_MINUTES = 4 * 60;
 
 /** Badge « Imminent » : départ dans moins de 4 h. */
@@ -294,6 +300,30 @@ export function departuresForCharts(groups) {
     ...g.trips,
     ...(g.connected_trips || []).map((c) => ({ date: c.date, heure_depart: c.heure_depart })),
   ]);
+}
+
+/**
+ * Prochain départ d'une destination (trajets déjà filtrés) : « auj. 20:42 », « demain 07:12 »,
+ * « sam. 14 07:12 » ; null si aucun trajet.
+ */
+export function nextDepartureLabel(trips, connectedTrips = [], today = getParisClock().today) {
+  let first = null;
+  for (const item of [...trips, ...connectedTrips]) {
+    const key = `${item.date}T${(item.heure_depart || "").slice(0, 5)}`;
+    if (!first || key < first.key) first = { key, date: item.date, time: key.slice(11) };
+  }
+  if (!first) return null;
+  let day;
+  if (first.date === today) day = "auj.";
+  else if (first.date === addCalendarDays(today, 1)) day = "demain";
+  else {
+    day = new Date(`${first.date}T12:00:00Z`).toLocaleDateString("fr-FR", {
+      weekday: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+  }
+  return `${day} ${first.time}`;
 }
 
 /** Regroupe directs et correspondances par date, triés par heure de départ. */

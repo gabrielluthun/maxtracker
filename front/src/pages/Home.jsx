@@ -27,16 +27,25 @@ import DestinationGroupSkeleton from "@/components/DestinationGroupSkeleton";
 import CalendarView from "@/components/CalendarView";
 import Disclaimer from "@/components/Disclaimer";
 import WelcomeModal from "@/components/WelcomeModal";
+import QuickFilters from "@/components/QuickFilters";
+import StationPill from "@/components/StationPill";
+import MobileBottomBar from "@/components/MobileBottomBar";
+import { activeFilterCount } from "@/lib/quickFilters";
+import { createPortal } from "react-dom";
+import { timeAgo } from "@/components/SyncBadge";
+import { useIsDesktop } from "@/hooks/useIsDesktop";
 import { NEW_TRIP_TITLE } from "@/components/NewBadge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSearchTrips } from "@/hooks/useSearchTrips";
 import {
   clearHidden,
+  getFavorites,
   getHidden,
   getSavedFilters,
   hideDestination,
   saveFilters,
+  toggleFavorite,
   unhideDestination,
 } from "@/lib/storage";
 import {
@@ -67,7 +76,7 @@ function searchStateFromLocation() {
 const MOBILE_INITIAL_DESTINATIONS = 10;
 const MOBILE_DESTINATIONS_STEP = 5;
 
-export default function Home({ syncInfo, registerRerunSearch }) {
+export default function Home({ syncInfo, registerRerunSearch, headerSlot }) {
   const [initial] = useState(searchStateFromLocation);
   const [origin, setOrigin] = useState(initial.station);
   const [searchOrigin, setSearchOrigin] = useState(initial.station?.raw ?? null);
@@ -80,6 +89,18 @@ export default function Home({ syncInfo, registerRerunSearch }) {
   const [destQuery, setDestQuery] = useState(initial.destQuery);
   const deferredDestQuery = useDeferredValue(destQuery);
   const [mobileVisibleDestinations, setMobileVisibleDestinations] = useState(MOBILE_INITIAL_DESTINATIONS);
+  const isDesktop = useIsDesktop();
+  const [favs, setFavs] = useState(getFavorites);
+  const onToggleFavorite = useCallback((station) => setFavs(toggleFavorite(station)), []);
+  // Mobile : avec une gare, l'accueil cède la place à la pastille de l'en-tête, sauf pendant « Modifier ».
+  const [editingStation, setEditingStation] = useState(false);
+  const compactMobile = !isDesktop && !!searchOrigin && !editingStation;
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const closeFilters = useCallback(() => setFiltersOpen(false), []);
+  // Passage au bureau (rotation de tablette) : la feuille disparaît, elle ne doit pas revenir seule.
+  useEffect(() => {
+    if (isDesktop) setFiltersOpen(false);
+  }, [isDesktop]);
 
   // Les correspondances (~85 % du volume) ne sont chargées que si le filtre les affiche.
   const wantConnections = filters.maxConnections > 0;
@@ -110,6 +131,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
       toast.error("Sélectionnez une gare valide");
       return;
     }
+    setEditingStation(false);
     startTransition(() => {
       setOrigin(station);
       setSearchOrigin(station.raw);
@@ -153,6 +175,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
         setDestQuery(state.destQuery);
         setTab(state.tab);
       });
+      setEditingStation(false);
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -264,6 +287,10 @@ export default function Home({ syncInfo, registerRerunSearch }) {
     });
   }, []);
   const onResetHidden = () => { clearHidden(); setHidden([]); };
+  const clearFilters = () => {
+    onFiltersChange(filtersWithDefaults());
+    setDestQuery("");
+  };
 
   const showEmpty = !data && !loading && !searchOrigin;
   const showResults = data && data.served && data.total_trips > 0;
@@ -272,37 +299,71 @@ export default function Home({ syncInfo, registerRerunSearch }) {
     <>
       <WelcomeModal />
 
-      <section className="relative">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold px-3 py-1 rounded-full mb-4">
-              <Sparkles className="h-3.5 w-3.5" /> {syncInfo?.total_trips ? `${syncInfo.total_trips.toLocaleString("fr-FR")} trajets éligibles suivis en France` : "Synchronisation en cours…"}
+      {compactMobile && headerSlot && origin && createPortal(
+        <StationPill
+          station={origin}
+          isFavorite={favs.some((f) => f.raw === origin.raw)}
+          onToggleFavorite={onToggleFavorite}
+          onEdit={() => {
+            setEditingStation(true);
+            window.scrollTo(0, 0);
+          }}
+        />,
+        headerSlot
+      )}
+
+      {!compactMobile && (
+        <section className="relative">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-6 lg:pt-10 lg:pb-8">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold px-3 py-1 rounded-full mb-3 lg:mb-4">
+                {isDesktop && <Sparkles className="h-3.5 w-3.5" />}
+                {syncInfo?.total_trips
+                  ? `${syncInfo.total_trips.toLocaleString("fr-FR")} trajets éligibles suivis${isDesktop ? " en France" : ""}`
+                  : "Synchronisation en cours…"}
+              </div>
+              {isDesktop ? (
+                <h1 className="text-6xl font-extrabold text-[#0A2540] leading-[1.05]">
+                  Tous les trajets éligibles <span className="text-[#10B981]">à 0€</span><br />
+                  depuis votre gare.
+                </h1>
+              ) : (
+                <h1 className="text-[32px] font-extrabold text-[#0A2540] leading-[1.08] tracking-[-0.02em]">
+                  Tous les trajets <span className="text-[#10B981]">à 0 €</span> depuis votre gare.
+                </h1>
+              )}
+              <p className="mt-3 lg:mt-4 text-sm lg:text-lg text-slate-600 max-w-2xl">
+                {isDesktop
+                  ? "Saisissez votre gare de départ : MaxTracker reprend les disponibilités TGV Max publiées chaque matin par la SNCF et regroupe pour vous toutes les destinations accessibles depuis n'importe quelle gare TGV."
+                  : "Les places TGV Max publiées chaque matin par la SNCF, regroupées par destination."}
+              </p>
             </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#0A2540] leading-[1.05]">
-              Tous les trajets éligibles <span className="text-[#10B981]">à 0€</span><br />
-              depuis votre gare.
-            </h1>
-            <p className="mt-4 text-base sm:text-lg text-slate-600 max-w-2xl">
-              Saisissez votre gare de départ : MaxTracker reprend les disponibilités TGV Max publiées chaque matin
-              par la SNCF et regroupe pour vous toutes les destinations accessibles depuis n'importe quelle gare TGV.
-            </p>
-          </div>
 
-          <div className="mt-8">
-            <SearchBar
-              origin={origin}
-              onOriginChange={setOrigin}
-              onSearch={handleSearch}
-              loading={uiPending}
-            />
+            <div className="mt-5 lg:mt-8">
+              <SearchBar
+                origin={origin}
+                onOriginChange={setOrigin}
+                onSearch={handleSearch}
+                loading={uiPending}
+                favs={favs}
+                onToggleFavorite={onToggleFavorite}
+                autoFocus={editingStation}
+              />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+      <section
+        className={cn(
+          "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16",
+          compactMobile && "pt-5",
+          showResults && !isDesktop && "pb-28" // place de la barre du bas
+        )}
+      >
         {loading && <ResultsSkeleton />}
 
-        {showEmpty && <EmptyHero />}
+        {showEmpty && isDesktop && <EmptyHero />}
 
         {!loading && data && !data.served && (
           <NotServed origin={data.origin} />
@@ -332,21 +393,23 @@ export default function Home({ syncInfo, registerRerunSearch }) {
               </div>
             )}
 
-            <div className="hidden lg:block lg:col-span-3 order-2 lg:order-1">
-              <FiltersPanel
-                filters={filters}
-                onChange={onFiltersChange}
-                hiddenCount={hidden.length}
-                onResetHidden={onResetHidden}
-                totalDestinations={visibleGroups.length}
-              />
-            </div>
+            {isDesktop && (
+              <div className="lg:col-span-3 order-2 lg:order-1">
+                <FiltersPanel
+                  filters={filters}
+                  onChange={onFiltersChange}
+                  hiddenCount={hidden.length}
+                  onResetHidden={onResetHidden}
+                  totalDestinations={visibleGroups.length}
+                />
+              </div>
+            )}
 
             <div className="lg:col-span-9 order-1 lg:order-2">
               <Tabs value={tab} onValueChange={setTab} data-testid="results-tabs">
                 <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
                   <div>
-                    <h2 className="text-2xl font-bold text-[#0A2540]">
+                    <h2 className="text-[22px] font-extrabold lg:text-2xl lg:font-bold text-[#0A2540]">
                       Au départ de <span className="text-[#10B981]">{data.origin}</span>
                     </h2>
                     <div className="text-sm text-slate-500 mt-0.5">
@@ -366,13 +429,26 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                         </span>
                       )}
                     </div>
+                    {!isDesktop && (
+                      <p className="mt-0.5 text-xs text-slate-500" data-testid="mobile-sync-line">
+                        Données SNCF à jour · vérifiées {timeAgo(syncInfo?.last_attempt_at || syncInfo?.last_sync_at)}
+                      </p>
+                    )}
                   </div>
-                  <TabsList className="bg-slate-100">
-                    <TabsTrigger value="list" data-testid="tab-list"><List className="h-4 w-4 mr-1.5" /> Liste</TabsTrigger>
-                    <TabsTrigger value="calendar" data-testid="tab-calendar"><CalendarDays className="h-4 w-4 mr-1.5" /> Calendrier</TabsTrigger>
-                    <TabsTrigger value="chart" data-testid="tab-chart"><BarChart3 className="h-4 w-4 mr-1.5" /> Pics horaires</TabsTrigger>
-                  </TabsList>
+                  {isDesktop && (
+                    <TabsList className="bg-slate-100">
+                      <TabsTrigger value="list" data-testid="tab-list"><List className="h-4 w-4 mr-1.5" /> Liste</TabsTrigger>
+                      <TabsTrigger value="calendar" data-testid="tab-calendar"><CalendarDays className="h-4 w-4 mr-1.5" /> Calendrier</TabsTrigger>
+                      <TabsTrigger value="chart" data-testid="tab-chart"><BarChart3 className="h-4 w-4 mr-1.5" /> Pics horaires</TabsTrigger>
+                    </TabsList>
+                  )}
                 </div>
+
+                {!isDesktop && (
+                  <div className="mb-3">
+                    <QuickFilters filters={filters} onChange={onFiltersChange} />
+                  </div>
+                )}
 
                 <div className="mb-4 flex flex-wrap items-center gap-3">
                   <div className="relative w-full sm:max-w-xs">
@@ -436,34 +512,54 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                             Effacer la recherche
                           </button>
                         </>
-                      ) : (
+                      ) : isDesktop ? (
                         "Aucun résultat avec ces filtres."
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      <div className={cn("hidden lg:block space-y-4", animateResults && "stagger")}>
-                        {visibleGroups.map((g) => (
-                          <DestinationGroup key={g.destination_city} group={g} onHide={onHide} />
-                        ))}
-                      </div>
-
-                      <div className={cn("lg:hidden space-y-4", animateResults && "stagger")}>
-                        {visibleGroups.slice(0, mobileVisibleDestinations).map((g) => (
-                          <DestinationGroup key={g.destination_city} group={g} onHide={onHide} />
-                        ))}
-                        {visibleGroups.length > mobileVisibleDestinations && (
+                      ) : (
+                        <>
+                          Aucun trajet avec ces filtres.
                           <button
                             type="button"
-                            onClick={() => setMobileVisibleDestinations((prev) => prev + MOBILE_DESTINATIONS_STEP)}
-                            className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#0A2540] hover:bg-slate-50 text-sm font-semibold text-slate-700 transition-colors"
-                            data-testid="mobile-load-more-destinations"
+                            onClick={clearFilters}
+                            className="mx-auto mt-3 block min-h-11 rounded-xl bg-slate-100 px-4 text-sm font-bold text-slate-900"
+                            data-testid="mobile-clear-filters"
                           >
-                            Afficher {MOBILE_DESTINATIONS_STEP} destinations de plus ({visibleGroups.length - mobileVisibleDestinations} restantes)
+                            Effacer les filtres
                           </button>
-                        )}
-                      </div>
-                    </>
+                        </>
+                      )}
+                    </div>
+                  ) : isDesktop ? (
+                    <div className={cn("space-y-4", animateResults && "stagger")}>
+                      {visibleGroups.map((g) => (
+                        <DestinationGroup key={g.destination_city} group={g} onHide={onHide} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className={cn("space-y-3", animateResults && "stagger")}>
+                      {visibleGroups.slice(0, mobileVisibleDestinations).map((g) => (
+                        <DestinationGroup key={g.destination_city} group={g} onHide={onHide} />
+                      ))}
+                      {visibleGroups.length > mobileVisibleDestinations && (
+                        <button
+                          type="button"
+                          onClick={() => setMobileVisibleDestinations((prev) => prev + MOBILE_DESTINATIONS_STEP)}
+                          className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#0A2540] hover:bg-slate-50 text-sm font-semibold text-slate-700 transition-colors"
+                          data-testid="mobile-load-more-destinations"
+                        >
+                          Afficher {MOBILE_DESTINATIONS_STEP} destinations de plus ({visibleGroups.length - mobileVisibleDestinations} restantes)
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {!isDesktop && hidden.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={onResetHidden}
+                      className="mt-3 w-full min-h-11 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-600"
+                      data-testid="mobile-reset-hidden-btn"
+                    >
+                      {hidden.length} destination{hidden.length > 1 ? "s" : ""} masquée{hidden.length > 1 ? "s" : ""} · Réafficher
+                    </button>
                   )}
                 </TabsContent>
 
@@ -485,18 +581,24 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                     </Suspense>
                   )}
                 </TabsContent>
+
+                {!isDesktop && (
+                  <MobileBottomBar activeCount={activeFilterCount(filters)} onOpenFilters={() => setFiltersOpen(true)} />
+                )}
               </Tabs>
             </div>
           </div>
         )}
 
-        {showResults && (
+        {showResults && !isDesktop && (
           <MobileFiltersSheet
+            open={filtersOpen}
+            onClose={closeFilters}
             filters={filters}
             onFiltersChange={onFiltersChange}
             hiddenCount={hidden.length}
             onResetHidden={onResetHidden}
-            totalDestinations={visibleGroups.length}
+            tripCount={visibleTrips}
           />
         )}
 

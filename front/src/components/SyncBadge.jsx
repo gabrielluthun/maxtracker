@@ -1,7 +1,7 @@
 import { Info, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-function timeAgo(iso) {
+export function timeAgo(iso) {
   if (!iso) return "—";
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);

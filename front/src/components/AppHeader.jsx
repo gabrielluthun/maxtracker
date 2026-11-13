@@ -2,6 +2,8 @@ import { useLayoutEffect, useState } from "react";
 import { Train, Search, Info, Sun, Moon } from "lucide-react";
 import { APP_VIEW, navigateToView } from "@/lib/appView";
 import { cn } from "@/lib/utils";
+import { useIsDesktop } from "@/hooks/useIsDesktop";
+import MobileMenu from "@/components/MobileMenu";
 
 const NAV_ITEMS = [
   { view: APP_VIEW.SEARCH, label: "Recherche", icon: Search, testId: "nav-search" },
@@ -19,8 +21,9 @@ function initialDark() {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
-export default function AppHeader({ activeView, trailing = null }) {
+export default function AppHeader({ activeView, trailing = null, slotRef, syncOk }) {
   const [dark, setDark] = useState(initialDark);
+  const isDesktop = useIsDesktop();
 
   useLayoutEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -30,6 +33,47 @@ export default function AppHeader({ activeView, trailing = null }) {
       /* ignore */
     }
   }, [dark]);
+
+  const toggleTheme = () => {
+    const root = document.documentElement;
+    root.classList.add("theme-transition");
+    setDark((d) => !d);
+    window.setTimeout(() => root.classList.remove("theme-transition"), 450);
+  };
+
+  if (!isDesktop) {
+    return (
+      // `group` : la pastille de gare (portée dans l'emplacement par Home) remplace le logo et l'état.
+      <header
+        className="group glass sticky top-0 z-40 border-b border-slate-200/60 dark:border-slate-700/60"
+        data-testid="app-header"
+      >
+        <div className="h-16 px-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigateToView(APP_VIEW.SEARCH)}
+            className="flex items-center gap-2.5 shrink-0 pl-1 rounded-lg group-has-[[data-header-pill]]:hidden"
+            data-testid="nav-logo"
+          >
+            <span className="h-9 w-9 rounded-xl bg-[#0A2540] dark:bg-slate-700 flex items-center justify-center">
+              <Train className="h-5 w-5 text-white" strokeWidth={2.5} aria-hidden="true" />
+            </span>
+            <span className="text-[18px] font-bold text-[#0A2540] dark:text-slate-100 tracking-tight" style={{ fontFamily: "'Outfit', sans-serif" }}>
+              MaxTracker
+            </span>
+          </button>
+          <div ref={slotRef} className="flex-1 min-w-0 flex items-center gap-1" />
+          <span className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 group-has-[[data-header-pill]]:hidden" data-testid="sync-state">
+            <span aria-hidden="true" className={cn("h-2 w-2 rounded-full", syncOk ? "bg-emerald-500" : "bg-amber-500")} />
+            {syncOk ? "À jour" : "Synchro en retard"}
+          </span>
+          <MobileMenu activeView={activeView} dark={dark} onToggleTheme={toggleTheme} syncOk={syncOk}>
+            {trailing}
+          </MobileMenu>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header
@@ -95,12 +139,7 @@ export default function AppHeader({ activeView, trailing = null }) {
           {trailing}
           <button
             type="button"
-            onClick={() => {
-              const root = document.documentElement;
-              root.classList.add("theme-transition");
-              setDark((d) => !d);
-              window.setTimeout(() => root.classList.remove("theme-transition"), 450);
-            }}
+            onClick={toggleTheme}
             className={cn(
               "p-2 rounded-full transition-colors shrink-0",
               dark

@@ -41,6 +41,8 @@ export default function AppRouter() {
   const [refreshing, setRefreshing] = useState(false);
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const rerunSearchRef = useRef(null);
+  // Emplacement de l'en-tête mobile où Home affiche la pastille de la gare recherchée.
+  const [headerSlot, setHeaderSlot] = useState(null);
 
   useEffect(() => {
     const onHashChange = () => setView(viewFromHash());
@@ -115,6 +117,8 @@ export default function AppRouter() {
       <div className="min-h-screen hero-radial">
         <AppHeader
           activeView={view}
+          slotRef={setHeaderSlot}
+          syncOk={["ok", "skipped"].includes(syncInfo?.last_sync_status)}
           trailing={
             <SyncBadge
               info={syncInfo}
@@ -129,7 +133,7 @@ export default function AppRouter() {
             <About />
           </Suspense>
         ) : (
-          <Home syncInfo={syncInfo} registerRerunSearch={registerRerunSearch} />
+          <Home syncInfo={syncInfo} registerRerunSearch={registerRerunSearch} headerSlot={headerSlot} />
         )}
       </div>
     </QueryClientProvider>
