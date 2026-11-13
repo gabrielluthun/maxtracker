@@ -598,7 +598,7 @@ export default function Home({ syncInfo, registerRerunSearch, headerSlot }) {
             onFiltersChange={onFiltersChange}
             hiddenCount={hidden.length}
             onResetHidden={onResetHidden}
-            totalDestinations={visibleGroups.length}
+            tripCount={visibleTrips}
           />
         )}
 
