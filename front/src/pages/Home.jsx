@@ -29,6 +29,8 @@ import Disclaimer from "@/components/Disclaimer";
 import WelcomeModal from "@/components/WelcomeModal";
 import QuickFilters from "@/components/QuickFilters";
 import StationPill from "@/components/StationPill";
+import MobileBottomBar from "@/components/MobileBottomBar";
+import { activeFilterCount } from "@/lib/quickFilters";
 import { createPortal } from "react-dom";
 import { timeAgo } from "@/components/SyncBadge";
 import { useIsDesktop } from "@/hooks/useIsDesktop";
@@ -93,6 +95,12 @@ export default function Home({ syncInfo, registerRerunSearch, headerSlot }) {
   // Mobile : avec une gare, l'accueil cède la place à la pastille de l'en-tête, sauf pendant « Modifier ».
   const [editingStation, setEditingStation] = useState(false);
   const compactMobile = !isDesktop && !!searchOrigin && !editingStation;
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const closeFilters = useCallback(() => setFiltersOpen(false), []);
+  // Passage au bureau (rotation de tablette) : la feuille disparaît, elle ne doit pas revenir seule.
+  useEffect(() => {
+    if (isDesktop) setFiltersOpen(false);
+  }, [isDesktop]);
 
   // Les correspondances (~85 % du volume) ne sont chargées que si le filtre les affiche.
   const wantConnections = filters.maxConnections > 0;
@@ -346,7 +354,13 @@ export default function Home({ syncInfo, registerRerunSearch, headerSlot }) {
         </section>
       )}
 
-      <section className={cn("max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16", compactMobile && "pt-5")}>
+      <section
+        className={cn(
+          "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16",
+          compactMobile && "pt-5",
+          showResults && !isDesktop && "pb-28" // place de la barre du bas
+        )}
+      >
         {loading && <ResultsSkeleton />}
 
         {showEmpty && isDesktop && <EmptyHero />}
@@ -421,11 +435,13 @@ export default function Home({ syncInfo, registerRerunSearch, headerSlot }) {
                       </p>
                     )}
                   </div>
-                  <TabsList className="bg-slate-100">
-                    <TabsTrigger value="list" data-testid="tab-list"><List className="h-4 w-4 mr-1.5" /> Liste</TabsTrigger>
-                    <TabsTrigger value="calendar" data-testid="tab-calendar"><CalendarDays className="h-4 w-4 mr-1.5" /> Calendrier</TabsTrigger>
-                    <TabsTrigger value="chart" data-testid="tab-chart"><BarChart3 className="h-4 w-4 mr-1.5" /> Pics horaires</TabsTrigger>
-                  </TabsList>
+                  {isDesktop && (
+                    <TabsList className="bg-slate-100">
+                      <TabsTrigger value="list" data-testid="tab-list"><List className="h-4 w-4 mr-1.5" /> Liste</TabsTrigger>
+                      <TabsTrigger value="calendar" data-testid="tab-calendar"><CalendarDays className="h-4 w-4 mr-1.5" /> Calendrier</TabsTrigger>
+                      <TabsTrigger value="chart" data-testid="tab-chart"><BarChart3 className="h-4 w-4 mr-1.5" /> Pics horaires</TabsTrigger>
+                    </TabsList>
+                  )}
                 </div>
 
                 {!isDesktop && (
@@ -565,6 +581,10 @@ export default function Home({ syncInfo, registerRerunSearch, headerSlot }) {
                     </Suspense>
                   )}
                 </TabsContent>
+
+                {!isDesktop && (
+                  <MobileBottomBar activeCount={activeFilterCount(filters)} onOpenFilters={() => setFiltersOpen(true)} />
+                )}
               </Tabs>
             </div>
           </div>
@@ -572,6 +592,8 @@ export default function Home({ syncInfo, registerRerunSearch, headerSlot }) {
 
         {showResults && !isDesktop && (
           <MobileFiltersSheet
+            open={filtersOpen}
+            onClose={closeFilters}
             filters={filters}
             onFiltersChange={onFiltersChange}
             hiddenCount={hidden.length}
