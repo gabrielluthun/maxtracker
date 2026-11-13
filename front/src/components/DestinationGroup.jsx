@@ -148,8 +148,9 @@ function DestinationGroup({ group, onHide }) {
           aria-expanded={open}
           aria-controls={panelId}
           className={cn(
-            "w-full flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left rounded-2xl pr-14",
-            isDesktop ? "p-5" : "py-3.5 pl-4"
+            "w-full flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left rounded-2xl",
+            isDesktop ? "p-5" : "py-3.5 pl-4",
+            "pr-14" // place du bouton « ⋯ », après le padding pour ne pas être écrasée
           )}
           data-testid={`group-toggle-${group.destination_city}`}
         >
