@@ -27,6 +27,9 @@ import DestinationGroupSkeleton from "@/components/DestinationGroupSkeleton";
 import CalendarView from "@/components/CalendarView";
 import Disclaimer from "@/components/Disclaimer";
 import WelcomeModal from "@/components/WelcomeModal";
+import QuickFilters from "@/components/QuickFilters";
+import { timeAgo } from "@/components/SyncBadge";
+import { useIsDesktop } from "@/hooks/useIsDesktop";
 import { NEW_TRIP_TITLE } from "@/components/NewBadge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -80,6 +83,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
   const [destQuery, setDestQuery] = useState(initial.destQuery);
   const deferredDestQuery = useDeferredValue(destQuery);
   const [mobileVisibleDestinations, setMobileVisibleDestinations] = useState(MOBILE_INITIAL_DESTINATIONS);
+  const isDesktop = useIsDesktop();
 
   // Les correspondances (~85 % du volume) ne sont chargées que si le filtre les affiche.
   const wantConnections = filters.maxConnections > 0;
@@ -264,6 +268,10 @@ export default function Home({ syncInfo, registerRerunSearch }) {
     });
   }, []);
   const onResetHidden = () => { clearHidden(); setHidden([]); };
+  const clearFilters = () => {
+    onFiltersChange(filtersWithDefaults());
+    setDestQuery("");
+  };
 
   const showEmpty = !data && !loading && !searchOrigin;
   const showResults = data && data.served && data.total_trips > 0;
@@ -332,21 +340,23 @@ export default function Home({ syncInfo, registerRerunSearch }) {
               </div>
             )}
 
-            <div className="hidden lg:block lg:col-span-3 order-2 lg:order-1">
-              <FiltersPanel
-                filters={filters}
-                onChange={onFiltersChange}
-                hiddenCount={hidden.length}
-                onResetHidden={onResetHidden}
-                totalDestinations={visibleGroups.length}
-              />
-            </div>
+            {isDesktop && (
+              <div className="lg:col-span-3 order-2 lg:order-1">
+                <FiltersPanel
+                  filters={filters}
+                  onChange={onFiltersChange}
+                  hiddenCount={hidden.length}
+                  onResetHidden={onResetHidden}
+                  totalDestinations={visibleGroups.length}
+                />
+              </div>
+            )}
 
             <div className="lg:col-span-9 order-1 lg:order-2">
               <Tabs value={tab} onValueChange={setTab} data-testid="results-tabs">
                 <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
                   <div>
-                    <h2 className="text-2xl font-bold text-[#0A2540]">
+                    <h2 className="text-[22px] font-extrabold lg:text-2xl lg:font-bold text-[#0A2540]">
                       Au départ de <span className="text-[#10B981]">{data.origin}</span>
                     </h2>
                     <div className="text-sm text-slate-500 mt-0.5">
@@ -366,6 +376,11 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                         </span>
                       )}
                     </div>
+                    {!isDesktop && (
+                      <p className="mt-0.5 text-xs text-slate-500" data-testid="mobile-sync-line">
+                        Données SNCF à jour · vérifiées {timeAgo(syncInfo?.last_attempt_at || syncInfo?.last_sync_at)}
+                      </p>
+                    )}
                   </div>
                   <TabsList className="bg-slate-100">
                     <TabsTrigger value="list" data-testid="tab-list"><List className="h-4 w-4 mr-1.5" /> Liste</TabsTrigger>
@@ -373,6 +388,12 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                     <TabsTrigger value="chart" data-testid="tab-chart"><BarChart3 className="h-4 w-4 mr-1.5" /> Pics horaires</TabsTrigger>
                   </TabsList>
                 </div>
+
+                {!isDesktop && (
+                  <div className="mb-3">
+                    <QuickFilters filters={filters} onChange={onFiltersChange} />
+                  </div>
+                )}
 
                 <div className="mb-4 flex flex-wrap items-center gap-3">
                   <div className="relative w-full sm:max-w-xs">
@@ -436,34 +457,54 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                             Effacer la recherche
                           </button>
                         </>
-                      ) : (
+                      ) : isDesktop ? (
                         "Aucun résultat avec ces filtres."
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      <div className={cn("hidden lg:block space-y-4", animateResults && "stagger")}>
-                        {visibleGroups.map((g) => (
-                          <DestinationGroup key={g.destination_city} group={g} onHide={onHide} />
-                        ))}
-                      </div>
-
-                      <div className={cn("lg:hidden space-y-4", animateResults && "stagger")}>
-                        {visibleGroups.slice(0, mobileVisibleDestinations).map((g) => (
-                          <DestinationGroup key={g.destination_city} group={g} onHide={onHide} />
-                        ))}
-                        {visibleGroups.length > mobileVisibleDestinations && (
+                      ) : (
+                        <>
+                          Aucun trajet avec ces filtres.
                           <button
                             type="button"
-                            onClick={() => setMobileVisibleDestinations((prev) => prev + MOBILE_DESTINATIONS_STEP)}
-                            className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#0A2540] hover:bg-slate-50 text-sm font-semibold text-slate-700 transition-colors"
-                            data-testid="mobile-load-more-destinations"
+                            onClick={clearFilters}
+                            className="mx-auto mt-3 block min-h-11 rounded-xl bg-slate-100 px-4 text-sm font-bold text-slate-900"
+                            data-testid="mobile-clear-filters"
                           >
-                            Afficher {MOBILE_DESTINATIONS_STEP} destinations de plus ({visibleGroups.length - mobileVisibleDestinations} restantes)
+                            Effacer les filtres
                           </button>
-                        )}
-                      </div>
-                    </>
+                        </>
+                      )}
+                    </div>
+                  ) : isDesktop ? (
+                    <div className={cn("space-y-4", animateResults && "stagger")}>
+                      {visibleGroups.map((g) => (
+                        <DestinationGroup key={g.destination_city} group={g} onHide={onHide} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className={cn("space-y-3", animateResults && "stagger")}>
+                      {visibleGroups.slice(0, mobileVisibleDestinations).map((g) => (
+                        <DestinationGroup key={g.destination_city} group={g} onHide={onHide} />
+                      ))}
+                      {visibleGroups.length > mobileVisibleDestinations && (
+                        <button
+                          type="button"
+                          onClick={() => setMobileVisibleDestinations((prev) => prev + MOBILE_DESTINATIONS_STEP)}
+                          className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#0A2540] hover:bg-slate-50 text-sm font-semibold text-slate-700 transition-colors"
+                          data-testid="mobile-load-more-destinations"
+                        >
+                          Afficher {MOBILE_DESTINATIONS_STEP} destinations de plus ({visibleGroups.length - mobileVisibleDestinations} restantes)
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {!isDesktop && hidden.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={onResetHidden}
+                      className="mt-3 w-full min-h-11 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-600"
+                      data-testid="mobile-reset-hidden-btn"
+                    >
+                      {hidden.length} destination{hidden.length > 1 ? "s" : ""} masquée{hidden.length > 1 ? "s" : ""} · Réafficher
+                    </button>
                   )}
                 </TabsContent>
 
@@ -490,7 +531,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
           </div>
         )}
 
-        {showResults && (
+        {showResults && !isDesktop && (
           <MobileFiltersSheet
             filters={filters}
             onFiltersChange={onFiltersChange}
