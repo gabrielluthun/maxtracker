@@ -31,6 +31,32 @@ function Group({ legend, children }) {
   );
 }
 
+/** Une seule valeur parmi quelques-unes (Correspondances, Période). */
+function Segmented({ options, selected, onSelect }) {
+  return (
+    <div className="grid auto-cols-fr grid-flow-col gap-1 rounded-xl bg-slate-100 p-1">
+      {options.map(({ value, label, testId }) => {
+        const on = selected === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onSelect(value)}
+            className={cn(
+              "min-h-11 rounded-lg text-sm font-semibold",
+              on ? "bg-[#FFFFFF] text-[#0F172A] shadow-sm dark:bg-[#F1F5F9] dark:text-[#0A0F1C]" : "text-slate-700"
+            )}
+            data-testid={testId}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Contenu à plat de la feuille de filtres mobile, dans l'ordre de la maquette. */
 export default function MobileFilters({ filters, onChange, hiddenCount, onResetHidden }) {
   const set = (key, value) => onChange({ ...filters, [key]: value });
@@ -55,29 +81,14 @@ export default function MobileFilters({ filters, onChange, hiddenCount, onResetH
       </label>
 
       <Group legend="Correspondances">
-        <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
-          {[
-            [0, "Direct"],
-            [1, "1 correspondance"],
-          ].map(([value, label]) => {
-            const on = (filters.maxConnections ?? 0) === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={on}
-                onClick={() => set("maxConnections", value)}
-                className={cn(
-                  "min-h-11 rounded-lg text-sm font-semibold",
-                  on ? "bg-[#FFFFFF] text-[#0F172A] shadow-sm dark:bg-[#F1F5F9] dark:text-[#0A0F1C]" : "text-slate-700"
-                )}
-                data-testid={`filter-connections-${value}`}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+        <Segmented
+          options={[
+            { value: 0, label: "Direct", testId: "filter-connections-0" },
+            { value: 1, label: "1 correspondance", testId: "filter-connections-1" },
+          ]}
+          selected={filters.maxConnections ?? 0}
+          onSelect={(value) => set("maxConnections", value)}
+        />
       </Group>
 
       <Group legend="Quand">
@@ -103,25 +114,16 @@ export default function MobileFilters({ filters, onChange, hiddenCount, onResetH
               </button>
             );
           })}
-          {DATE_HORIZON_OPTIONS.map(({ value, testId }) => {
-            const on = filters.dateHorizonDays === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={on}
-                onClick={() => set("dateHorizonDays", value)}
-                className={cn(
-                  "min-h-11 rounded-full border px-4 text-sm font-semibold",
-                  on ? "border-emerald-500 bg-emerald-500/15 text-emerald-800" : "border-slate-300 dark:border-slate-600 text-slate-700"
-                )}
-                data-testid={testId}
-              >
-                {value} jours
-              </button>
-            );
-          })}
         </div>
+      </Group>
+
+      {/* Période à part : une valeur toujours choisie, d'où le bloc segmenté (et non des pastilles). */}
+      <Group legend="Période">
+        <Segmented
+          options={DATE_HORIZON_OPTIONS.map(({ value, testId }) => ({ value, label: `${value} jours`, testId }))}
+          selected={filters.dateHorizonDays}
+          onSelect={(value) => set("dateHorizonDays", value)}
+        />
       </Group>
 
       <Group legend="Heure de départ">
