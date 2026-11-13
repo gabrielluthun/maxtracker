@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, MapPin, EyeOff, MoreVertical } from "lucide-react";
 import TrainCard from "@/components/TrainCard";
+import TrainRow from "@/components/TrainRow";
 import ConnectedTripCard from "@/components/ConnectedTripCard";
 import NewBadge from "@/components/NewBadge";
 import {
@@ -28,7 +29,10 @@ function shortDayLabel(date) {
 function DayHeader({ date, today, itemCount, isDesktop }) {
   return (
     <div
-      className="-mx-5 sticky top-16 z-30 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-y border-slate-200 dark:border-slate-700 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-sm px-5 py-2"
+      className={cn(
+        "sticky top-16 z-30 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-y border-slate-200 dark:border-slate-700 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-sm py-2",
+        isDesktop ? "-mx-5 px-5" : "px-4"
+      )}
       data-testid={`day-header-${date}`}
     >
       <h4 className="text-xs font-bold uppercase tracking-[0.06em] text-slate-800 dark:text-slate-100">
@@ -198,9 +202,9 @@ function DestinationGroup({ group, onHide }) {
       </div>
 
       {open && (
-        <div id={panelId} className="px-5 pb-5">
+        <div id={panelId} className={isDesktop ? "px-5 pb-5" : "pb-1"}>
           {group.destinations.length > 1 && (
-            <div className="mb-3 flex flex-wrap gap-1.5">
+            <div className={cn("mb-3 flex flex-wrap gap-1.5", !isDesktop && "px-4")}>
               {group.destinations.map((d) => (
                 <span
                   key={d}
@@ -212,18 +216,24 @@ function DestinationGroup({ group, onHide }) {
             </div>
           )}
 
-          <div className="space-y-5">
+          <div className={isDesktop ? "space-y-5" : undefined}>
             {daySections.map((day) => (
               <section key={day.date} data-testid={`day-section-${day.date}`}>
                 <DayHeader date={day.date} today={today} itemCount={day.items.length} isDesktop={isDesktop} />
-                <div className="space-y-3 pt-3">
-                  {day.items.map((item) =>
-                    item.kind === "direct" ? (
-                      <TrainCard key={tripKey(item.trip)} trip={item.trip} />
-                    ) : (
-                      <ConnectedTripCard key={journeyKey(item.connected)} connected={item.connected} />
-                    )
-                  )}
+                <div className={isDesktop ? "space-y-3 pt-3" : undefined}>
+                  {day.items.map((item) => {
+                    if (item.kind === "direct") {
+                      const Row = isDesktop ? TrainCard : TrainRow;
+                      return <Row key={tripKey(item.trip)} trip={item.trip} />;
+                    }
+                    const card = <ConnectedTripCard key={journeyKey(item.connected)} connected={item.connected} />;
+                    if (isDesktop) return card;
+                    return (
+                      <div key={journeyKey(item.connected)} className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 last:border-b-0">
+                        {card}
+                      </div>
+                    );
+                  })}
                 </div>
               </section>
             ))}
