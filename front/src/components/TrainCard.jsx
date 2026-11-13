@@ -12,13 +12,13 @@ import {
 import { tripConnectUrl } from "@/lib/sncfConnect";
 import { tripKey } from "@/lib/tripKeys";
 
-const TRAIN_TYPE_STYLES = {
-  TGV_INOUI: { ribbon: "bg-[#E11D48]", badge: "bg-[#E11D48] text-white", label: "TGV INOUI" },
-  INTERCITES: { ribbon: "bg-[#0284C7]", badge: "bg-[#0284C7] text-white", label: "INTERCITÉS" },
-  INTERCITES_NUIT: { ribbon: "bg-[#4F46E5]", badge: "bg-[#4F46E5] text-white", label: "INTERCITÉS DE NUIT" },
+export const TRAIN_TYPE_STYLES = {
+  TGV_INOUI: { ribbon: "bg-[#E11D48]", badge: "bg-[#E11D48] text-white", label: "TGV INOUI", short: "TGV" },
+  INTERCITES: { ribbon: "bg-[#0284C7]", badge: "bg-[#0284C7] text-white", label: "INTERCITÉS", short: "IC" },
+  INTERCITES_NUIT: { ribbon: "bg-[#4F46E5]", badge: "bg-[#4F46E5] text-white", label: "INTERCITÉS DE NUIT", short: "NUIT" },
 };
 
-function fmtHHmm(s) {
+export function fmtHHmm(s) {
   return (s || "").slice(0, 5);
 }
 
@@ -34,7 +34,7 @@ function durationStr(dep, arr) {
 }
 
 
-function formatFare(fareEur) {
+export function formatFare(fareEur) {
   if (fareEur === 0 || fareEur === 0.0) return "0€";
   return `${fareEur.toFixed(2).replace(".", ",")}€`;
 }
