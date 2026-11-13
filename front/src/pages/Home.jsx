@@ -28,6 +28,10 @@ import CalendarView from "@/components/CalendarView";
 import Disclaimer from "@/components/Disclaimer";
 import WelcomeModal from "@/components/WelcomeModal";
 import QuickFilters from "@/components/QuickFilters";
+import StationPill from "@/components/StationPill";
+import MobileBottomBar from "@/components/MobileBottomBar";
+import { activeFilterCount } from "@/lib/quickFilters";
+import { createPortal } from "react-dom";
 import { timeAgo } from "@/components/SyncBadge";
 import { useIsDesktop } from "@/hooks/useIsDesktop";
 import { NEW_TRIP_TITLE } from "@/components/NewBadge";
@@ -36,10 +40,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSearchTrips } from "@/hooks/useSearchTrips";
 import {
   clearHidden,
+  getFavorites,
   getHidden,
   getSavedFilters,
   hideDestination,
   saveFilters,
+  toggleFavorite,
   unhideDestination,
 } from "@/lib/storage";
 import {
@@ -70,7 +76,7 @@ function searchStateFromLocation() {
 const MOBILE_INITIAL_DESTINATIONS = 10;
 const MOBILE_DESTINATIONS_STEP = 5;
 
-export default function Home({ syncInfo, registerRerunSearch }) {
+export default function Home({ syncInfo, registerRerunSearch, headerSlot }) {
   const [initial] = useState(searchStateFromLocation);
   const [origin, setOrigin] = useState(initial.station);
   const [searchOrigin, setSearchOrigin] = useState(initial.station?.raw ?? null);
@@ -84,6 +90,17 @@ export default function Home({ syncInfo, registerRerunSearch }) {
   const deferredDestQuery = useDeferredValue(destQuery);
   const [mobileVisibleDestinations, setMobileVisibleDestinations] = useState(MOBILE_INITIAL_DESTINATIONS);
   const isDesktop = useIsDesktop();
+  const [favs, setFavs] = useState(getFavorites);
+  const onToggleFavorite = useCallback((station) => setFavs(toggleFavorite(station)), []);
+  // Mobile : avec une gare, l'accueil cède la place à la pastille de l'en-tête, sauf pendant « Modifier ».
+  const [editingStation, setEditingStation] = useState(false);
+  const compactMobile = !isDesktop && !!searchOrigin && !editingStation;
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const closeFilters = useCallback(() => setFiltersOpen(false), []);
+  // Passage au bureau (rotation de tablette) : la feuille disparaît, elle ne doit pas revenir seule.
+  useEffect(() => {
+    if (isDesktop) setFiltersOpen(false);
+  }, [isDesktop]);
 
   // Les correspondances (~85 % du volume) ne sont chargées que si le filtre les affiche.
   const wantConnections = filters.maxConnections > 0;
@@ -114,6 +131,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
       toast.error("Sélectionnez une gare valide");
       return;
     }
+    setEditingStation(false);
     startTransition(() => {
       setOrigin(station);
       setSearchOrigin(station.raw);
@@ -157,6 +175,7 @@ export default function Home({ syncInfo, registerRerunSearch }) {
         setDestQuery(state.destQuery);
         setTab(state.tab);
       });
+      setEditingStation(false);
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -280,37 +299,71 @@ export default function Home({ syncInfo, registerRerunSearch }) {
     <>
       <WelcomeModal />
 
-      <section className="relative">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold px-3 py-1 rounded-full mb-4">
-              <Sparkles className="h-3.5 w-3.5" /> {syncInfo?.total_trips ? `${syncInfo.total_trips.toLocaleString("fr-FR")} trajets éligibles suivis en France` : "Synchronisation en cours…"}
+      {compactMobile && headerSlot && origin && createPortal(
+        <StationPill
+          station={origin}
+          isFavorite={favs.some((f) => f.raw === origin.raw)}
+          onToggleFavorite={onToggleFavorite}
+          onEdit={() => {
+            setEditingStation(true);
+            window.scrollTo(0, 0);
+          }}
+        />,
+        headerSlot
+      )}
+
+      {!compactMobile && (
+        <section className="relative">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-6 lg:pt-10 lg:pb-8">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold px-3 py-1 rounded-full mb-3 lg:mb-4">
+                {isDesktop && <Sparkles className="h-3.5 w-3.5" />}
+                {syncInfo?.total_trips
+                  ? `${syncInfo.total_trips.toLocaleString("fr-FR")} trajets éligibles suivis${isDesktop ? " en France" : ""}`
+                  : "Synchronisation en cours…"}
+              </div>
+              {isDesktop ? (
+                <h1 className="text-6xl font-extrabold text-[#0A2540] leading-[1.05]">
+                  Tous les trajets éligibles <span className="text-[#10B981]">à 0€</span><br />
+                  depuis votre gare.
+                </h1>
+              ) : (
+                <h1 className="text-[32px] font-extrabold text-[#0A2540] leading-[1.08] tracking-[-0.02em]">
+                  Tous les trajets <span className="text-[#10B981]">à 0 €</span> depuis votre gare.
+                </h1>
+              )}
+              <p className="mt-3 lg:mt-4 text-sm lg:text-lg text-slate-600 max-w-2xl">
+                {isDesktop
+                  ? "Saisissez votre gare de départ : MaxTracker reprend les disponibilités TGV Max publiées chaque matin par la SNCF et regroupe pour vous toutes les destinations accessibles depuis n'importe quelle gare TGV."
+                  : "Les places TGV Max publiées chaque matin par la SNCF, regroupées par destination."}
+              </p>
             </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#0A2540] leading-[1.05]">
-              Tous les trajets éligibles <span className="text-[#10B981]">à 0€</span><br />
-              depuis votre gare.
-            </h1>
-            <p className="mt-4 text-base sm:text-lg text-slate-600 max-w-2xl">
-              Saisissez votre gare de départ : MaxTracker reprend les disponibilités TGV Max publiées chaque matin
-              par la SNCF et regroupe pour vous toutes les destinations accessibles depuis n'importe quelle gare TGV.
-            </p>
-          </div>
 
-          <div className="mt-8">
-            <SearchBar
-              origin={origin}
-              onOriginChange={setOrigin}
-              onSearch={handleSearch}
-              loading={uiPending}
-            />
+            <div className="mt-5 lg:mt-8">
+              <SearchBar
+                origin={origin}
+                onOriginChange={setOrigin}
+                onSearch={handleSearch}
+                loading={uiPending}
+                favs={favs}
+                onToggleFavorite={onToggleFavorite}
+                autoFocus={editingStation}
+              />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+      <section
+        className={cn(
+          "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16",
+          compactMobile && "pt-5",
+          showResults && !isDesktop && "pb-28" // place de la barre du bas
+        )}
+      >
         {loading && <ResultsSkeleton />}
 
-        {showEmpty && <EmptyHero />}
+        {showEmpty && isDesktop && <EmptyHero />}
 
         {!loading && data && !data.served && (
           <NotServed origin={data.origin} />
@@ -382,11 +435,13 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                       </p>
                     )}
                   </div>
-                  <TabsList className="bg-slate-100">
-                    <TabsTrigger value="list" data-testid="tab-list"><List className="h-4 w-4 mr-1.5" /> Liste</TabsTrigger>
-                    <TabsTrigger value="calendar" data-testid="tab-calendar"><CalendarDays className="h-4 w-4 mr-1.5" /> Calendrier</TabsTrigger>
-                    <TabsTrigger value="chart" data-testid="tab-chart"><BarChart3 className="h-4 w-4 mr-1.5" /> Pics horaires</TabsTrigger>
-                  </TabsList>
+                  {isDesktop && (
+                    <TabsList className="bg-slate-100">
+                      <TabsTrigger value="list" data-testid="tab-list"><List className="h-4 w-4 mr-1.5" /> Liste</TabsTrigger>
+                      <TabsTrigger value="calendar" data-testid="tab-calendar"><CalendarDays className="h-4 w-4 mr-1.5" /> Calendrier</TabsTrigger>
+                      <TabsTrigger value="chart" data-testid="tab-chart"><BarChart3 className="h-4 w-4 mr-1.5" /> Pics horaires</TabsTrigger>
+                    </TabsList>
+                  )}
                 </div>
 
                 {!isDesktop && (
@@ -526,6 +581,10 @@ export default function Home({ syncInfo, registerRerunSearch }) {
                     </Suspense>
                   )}
                 </TabsContent>
+
+                {!isDesktop && (
+                  <MobileBottomBar activeCount={activeFilterCount(filters)} onOpenFilters={() => setFiltersOpen(true)} />
+                )}
               </Tabs>
             </div>
           </div>
@@ -533,6 +592,8 @@ export default function Home({ syncInfo, registerRerunSearch }) {
 
         {showResults && !isDesktop && (
           <MobileFiltersSheet
+            open={filtersOpen}
+            onClose={closeFilters}
             filters={filters}
             onFiltersChange={onFiltersChange}
             hiddenCount={hidden.length}

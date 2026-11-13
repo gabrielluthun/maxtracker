@@ -1,55 +1,36 @@
-import { useEffect, useId, useRef, useState } from "react";
-import { SlidersHorizontal, X } from "lucide-react";
+import { useEffect, useId, useState } from "react";
+import { X } from "lucide-react";
 import FiltersPanel from "@/components/FiltersPanel";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { cn } from "@/lib/utils";
 
+/** Feuille de filtres (mobile), ouverte par le bouton Filtres de la barre du bas. */
 export default function MobileFiltersSheet({
+  open,
+  onClose,
   filters,
   onFiltersChange,
   hiddenCount,
   onResetHidden,
   totalDestinations,
 }) {
-  const [open, setOpen] = useState(false);
+  // `mounted` garde la feuille dans le DOM le temps de l'animation de fermeture.
   const [mounted, setMounted] = useState(false);
-  const [btnPressed, setBtnPressed] = useState(false);
-  const openTimerRef = useRef(null);
-  const closeTimerRef = useRef(null);
+  const [shown, setShown] = useState(false);
 
   useEffect(() => {
-    return () => {
-      if (openTimerRef.current) clearTimeout(openTimerRef.current);
-      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    };
-  }, []);
-
-  const openWithPressAnimation = () => {
-    if (openTimerRef.current) clearTimeout(openTimerRef.current);
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-    setBtnPressed(true);
-    openTimerRef.current = setTimeout(() => {
+    if (open) {
       setMounted(true);
-      requestAnimationFrame(() => setOpen(true));
-      setBtnPressed(false);
-      openTimerRef.current = null;
-    }, 130);
-  };
-
-  const closeSheet = () => {
-    setOpen(false);
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = setTimeout(() => {
-      setMounted(false);
-      closeTimerRef.current = null;
-    }, 220);
-  };
+      const frame = requestAnimationFrame(() => setShown(true));
+      return () => cancelAnimationFrame(frame);
+    }
+    setShown(false);
+    const timer = setTimeout(() => setMounted(false), 220);
+    return () => clearTimeout(timer);
+  }, [open]);
 
   const titleId = useId();
-  const sheetRef = useDialogFocus(mounted, closeSheet);
+  const sheetRef = useDialogFocus(mounted, onClose);
 
   // Pas de défilement de la page derrière la feuille.
   useEffect(() => {
@@ -61,70 +42,53 @@ export default function MobileFiltersSheet({
     };
   }, [mounted]);
 
+  if (!mounted) return null;
+
   return (
-    <>
+    <div className="fixed inset-0 z-50" data-testid="mobile-filters-sheet">
       <button
         type="button"
-        onClick={openWithPressAnimation}
-        aria-haspopup="dialog"
-        aria-expanded={mounted}
+        tabIndex={-1}
+        aria-label="Fermer les filtres"
         className={cn(
-          "lg:hidden fixed bottom-4 right-4 z-40 inline-flex items-center gap-2 rounded-full bg-[#0A2540] text-white px-4 py-3 shadow-lg transition-all duration-150 ease-out",
-          btnPressed ? "scale-90 shadow-md bg-[#173A5E]" : "scale-100"
+          "absolute inset-0 bg-slate-900/35 transition-opacity duration-200",
+          shown ? "opacity-100" : "opacity-0"
         )}
-        data-testid="mobile-filters-open-btn"
+        onClick={onClose}
+      />
+      <div
+        ref={sheetRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className={cn(
+          "absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-3xl bg-white dark:bg-slate-900 p-4 pb-6 shadow-2xl transition-transform duration-200 ease-out",
+          shown ? "translate-y-0" : "translate-y-full"
+        )}
       >
-        <SlidersHorizontal className="h-4 w-4" />
-        Filtres
-      </button>
-
-      {mounted && (
-        <div className="lg:hidden fixed inset-0 z-50" data-testid="mobile-filters-sheet">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 id={titleId} className="text-base font-bold text-slate-900 dark:text-slate-100">Filtres</h3>
           <button
             type="button"
-            tabIndex={-1}
-            aria-label="Fermer les filtres"
-            className={cn(
-              "absolute inset-0 bg-slate-900/35 transition-opacity duration-200",
-              open ? "opacity-100" : "opacity-0"
-            )}
-            onClick={closeSheet}
-          />
-          <div
-            ref={sheetRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            tabIndex={-1}
-            className={cn(
-              "absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-3xl bg-white dark:bg-slate-900 p-4 pb-6 shadow-2xl transition-transform duration-200 ease-out",
-              open ? "translate-y-0" : "translate-y-full"
-            )}
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-slate-100"
+            aria-label="Fermer"
+            data-testid="mobile-filters-close-btn"
           >
-            <div className="mb-3 flex items-center justify-between">
-              <h3 id={titleId} className="text-base font-bold text-slate-900 dark:text-slate-100">Filtres</h3>
-              <button
-                type="button"
-                onClick={closeSheet}
-                className="p-2 rounded-full hover:bg-slate-100"
-                aria-label="Fermer"
-                data-testid="mobile-filters-close-btn"
-              >
-                <X className="h-4 w-4 text-slate-600" />
-              </button>
-            </div>
-
-            <FiltersPanel
-              filters={filters}
-              onChange={onFiltersChange}
-              hiddenCount={hiddenCount}
-              onResetHidden={onResetHidden}
-              totalDestinations={totalDestinations}
-              className="sticky top-0 border-none shadow-none rounded-none p-0"
-            />
-          </div>
+            <X className="h-4 w-4 text-slate-600" />
+          </button>
         </div>
-      )}
-    </>
+
+        <FiltersPanel
+          filters={filters}
+          onChange={onFiltersChange}
+          hiddenCount={hiddenCount}
+          onResetHidden={onResetHidden}
+          totalDestinations={totalDestinations}
+          className="sticky top-0 border-none shadow-none rounded-none p-0"
+        />
+      </div>
+    </div>
   );
 }
