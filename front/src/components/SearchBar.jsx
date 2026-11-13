@@ -1,18 +1,16 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Search, Star, X, MapPin, Loader2 } from "lucide-react";
 import { searchStations } from "@/lib/api";
-import { getFavorites, toggleFavorite } from "@/lib/storage";
 import { usePrefetchSearch } from "@/hooks/useSearchTrips";
 import { cn } from "@/lib/utils";
 
 const STATIONS_DEBOUNCE_MS = 120;
 
-export default function SearchBar({ origin, onOriginChange, onSearch, loading }) {
+export default function SearchBar({ origin, onOriginChange, onSearch, loading, favs, onToggleFavorite }) {
   const [query, setQuery] = useState(origin?.name || "");
   const [suggestions, setSuggestions] = useState([]);
   const [stationsLoading, setStationsLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [favs, setFavs] = useState(getFavorites());
   const [active, setActive] = useState(-1);
   const wrapRef = useRef(null);
   const cacheRef = useRef(new Map());
@@ -103,8 +101,7 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
 
   const fav = origin ? !!favs.find((f) => f.raw === origin.raw) : false;
   const onFav = () => {
-    if (!origin) return;
-    setFavs(toggleFavorite(origin));
+    if (origin) onToggleFavorite(origin);
   };
 
   const handlePrefetch = () => {
@@ -256,7 +253,7 @@ export default function SearchBar({ origin, onOriginChange, onSearch, loading })
                 </button>
                 <button
                   data-testid={`fav-remove-${f.raw}`}
-                  onClick={() => setFavs(toggleFavorite(f))}
+                  onClick={() => onToggleFavorite(f)}
                   className="opacity-50 hover:opacity-100 ml-1 p-0.5 rounded-full hover:bg-amber-100"
                   title="Retirer"
                 >

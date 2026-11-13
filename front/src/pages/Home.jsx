@@ -36,10 +36,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSearchTrips } from "@/hooks/useSearchTrips";
 import {
   clearHidden,
+  getFavorites,
   getHidden,
   getSavedFilters,
   hideDestination,
   saveFilters,
+  toggleFavorite,
   unhideDestination,
 } from "@/lib/storage";
 import {
@@ -84,6 +86,8 @@ export default function Home({ syncInfo, registerRerunSearch }) {
   const deferredDestQuery = useDeferredValue(destQuery);
   const [mobileVisibleDestinations, setMobileVisibleDestinations] = useState(MOBILE_INITIAL_DESTINATIONS);
   const isDesktop = useIsDesktop();
+  const [favs, setFavs] = useState(getFavorites);
+  const onToggleFavorite = useCallback((station) => setFavs(toggleFavorite(station)), []);
 
   // Les correspondances (~85 % du volume) ne sont chargées que si le filtre les affiche.
   const wantConnections = filters.maxConnections > 0;
@@ -302,6 +306,8 @@ export default function Home({ syncInfo, registerRerunSearch }) {
               onOriginChange={setOrigin}
               onSearch={handleSearch}
               loading={uiPending}
+              favs={favs}
+              onToggleFavorite={onToggleFavorite}
             />
           </div>
         </div>
