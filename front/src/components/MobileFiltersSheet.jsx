@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
-import { X } from "lucide-react";
-import FiltersPanel from "@/components/FiltersPanel";
+import MobileFilters from "@/components/MobileFilters";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { filtersWithDefaults } from "@/lib/urlState";
 import { cn } from "@/lib/utils";
 
 /** Feuille de filtres (mobile), ouverte par le bouton Filtres de la barre du bas. */
@@ -12,7 +12,7 @@ export default function MobileFiltersSheet({
   onFiltersChange,
   hiddenCount,
   onResetHidden,
-  totalDestinations,
+  tripCount,
 }) {
   // `mounted` garde la feuille dans le DOM le temps de l'animation de fermeture.
   const [mounted, setMounted] = useState(false);
@@ -63,31 +63,44 @@ export default function MobileFiltersSheet({
         aria-labelledby={titleId}
         tabIndex={-1}
         className={cn(
-          "absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-3xl bg-white dark:bg-slate-900 p-4 pb-6 shadow-2xl transition-transform duration-200 ease-out",
+          "absolute inset-x-0 bottom-0 max-h-[90vh] flex flex-col rounded-t-3xl border-t border-slate-200 bg-white shadow-2xl transition-transform duration-200 ease-out",
           shown ? "translate-y-0" : "translate-y-full"
         )}
       >
-        <div className="mb-3 flex items-center justify-between">
-          <h3 id={titleId} className="text-base font-bold text-slate-900 dark:text-slate-100">Filtres</h3>
+        <div aria-hidden="true" className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-slate-300 dark:bg-slate-600" />
+        <div className="flex items-center px-4 pt-2.5 pb-1.5">
+          <h2 id={titleId} className="text-[22px] font-extrabold text-slate-900">Filtres</h2>
           <button
             type="button"
-            onClick={onClose}
-            className="p-2 rounded-full hover:bg-slate-100"
-            aria-label="Fermer"
-            data-testid="mobile-filters-close-btn"
+            onClick={() => onFiltersChange(filtersWithDefaults())}
+            className="ml-auto min-h-11 px-1 text-sm font-semibold text-slate-500 underline underline-offset-2"
+            data-testid="mobile-filters-clear"
           >
-            <X className="h-4 w-4 text-slate-600" />
+            Tout effacer
           </button>
         </div>
 
-        <FiltersPanel
-          filters={filters}
-          onChange={onFiltersChange}
-          hiddenCount={hiddenCount}
-          onResetHidden={onResetHidden}
-          totalDestinations={totalDestinations}
-          className="sticky top-0 border-none shadow-none rounded-none p-0"
-        />
+        <div className="flex-1 overflow-y-auto px-4 pt-2 pb-5">
+          <MobileFilters
+            filters={filters}
+            onChange={onFiltersChange}
+            hiddenCount={hiddenCount}
+            onResetHidden={onResetHidden}
+          />
+        </div>
+
+        <div className="border-t border-slate-200 px-4 pt-3 pb-[max(1.125rem,env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full min-h-[52px] rounded-2xl bg-[#10B981] dark:bg-emerald-400 text-base font-extrabold text-[#052E1F]"
+            data-testid="mobile-filters-apply"
+          >
+            {tripCount === 0
+              ? "Aucun trajet"
+              : `Voir ${tripCount.toLocaleString("fr-FR")} trajet${tripCount > 1 ? "s" : ""}`}
+          </button>
+        </div>
       </div>
     </div>
   );
